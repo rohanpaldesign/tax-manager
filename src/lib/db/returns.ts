@@ -1,4 +1,4 @@
-import { db } from "./client";
+import { getDb } from "./client";
 import type { TaxReturnInput, TaxCalculationResult } from "@/types/tax";
 import { randomUUID } from "crypto";
 
@@ -15,13 +15,22 @@ export interface TaxReturn {
 
 export async function createTaxReturn(
   sessionKey: string,
-  input: TaxReturnInput
+  input: TaxReturnInput,
+  result?: TaxCalculationResult
 ): Promise<string> {
   const id = randomUUID();
+  const db = getDb();
+  if (!db) return id; // stateless mode — return id without persisting
   await db.execute({
-    sql: `INSERT INTO tax_returns (id, session_key, input_json, status)
-          VALUES (?, ?, ?, 'draft')`,
-    args: [id, sessionKey, JSON.stringify(input)],
+    sql: `INSERT INTO tax_returns (id, session_key, input_json, result_json, status)
+          VALUES (?, ?, ?, ?, ?)`,
+    args: [
+      id,
+      sessionKey,
+      JSON.stringify(input),
+      result ? JSON.stringify(result) : null,
+      result ? "complete" : "draft",
+    ],
   });
   return id;
 }
@@ -30,12 +39,14 @@ export async function getTaxReturn(
   id: string,
   sessionKey: string
 ): Promise<TaxReturn | null> {
+  const db = getDb();
+  if (!db) return null;
   const result = await db.execute({
     sql: `SELECT * FROM tax_returns WHERE id = ? AND session_key = ?`,
     args: [id, sessionKey],
   });
   if (result.rows.length === 0) return null;
-  return rowToTaxReturn(result.rows[0]);
+  return rowToTaxReturn(result.rows[0] as Record<string, unknown>);
 }
 
 export async function updateTaxReturn(
@@ -44,6 +55,8 @@ export async function updateTaxReturn(
   input: TaxReturnInput,
   result?: TaxCalculationResult
 ): Promise<void> {
+  const db = getDb();
+  if (!db) return;
   await db.execute({
     sql: `UPDATE tax_returns
           SET input_json = ?, result_json = ?, status = ?, updated_at = datetime('now')
@@ -59,17 +72,21 @@ export async function updateTaxReturn(
 }
 
 export async function listTaxReturns(sessionKey: string): Promise<TaxReturn[]> {
+  const db = getDb();
+  if (!db) return [];
   const result = await db.execute({
     sql: `SELECT * FROM tax_returns WHERE session_key = ? ORDER BY updated_at DESC`,
     args: [sessionKey],
   });
-  return result.rows.map(rowToTaxReturn);
+  return result.rows.map((r) => rowToTaxReturn(r as Record<string, unknown>));
 }
 
 export async function deleteTaxReturn(
   id: string,
   sessionKey: string
 ): Promise<void> {
+  const db = getDb();
+  if (!db) return;
   await db.execute({
     sql: `DELETE FROM tax_returns WHERE id = ? AND session_key = ?`,
     args: [id, sessionKey],
@@ -83,7 +100,9 @@ function rowToTaxReturn(row: Record<string, unknown>): TaxReturn {
     sessionKey: row.session_key as string,
     status: row.status as "draft" | "complete",
     input: JSON.parse(row.input_json as string),
-    result: row.result_json ? JSON.parse(row.result_json as string) : undefined,
+    result: row.result_json
+      ? JSON.parse(row.result_json as string)
+      : undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };

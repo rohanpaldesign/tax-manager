@@ -36,7 +36,12 @@ export function ResultsDashboard({ result, returnId, input, onBack }: Props) {
   const downloadPDF = async () => {
     setDownloading(true);
     try {
-      const res = await fetch(`/api/returns/${returnId}/pdf`);
+      // POST the result directly — no DB lookup needed
+      const res = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input, result }),
+      });
       if (!res.ok) throw new Error("Failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -46,7 +51,7 @@ export function ResultsDashboard({ result, returnId, input, onBack }: Props) {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Failed to download PDF");
+      alert("Failed to download PDF. Please try again.");
     } finally {
       setDownloading(false);
     }

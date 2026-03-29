@@ -305,8 +305,9 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     return s + gross - expenses;
   }, 0);
 
-  // Schedule E — Rental
-  const scheduleE_net = input.rentalProperties.reduce((s, prop) => {
+  // Schedule E — Rental (PAL rules applied after AGI is known)
+  // We compute gross rental net here; PAL limitation is applied after AGI.
+  const rentalNetPerProperty = input.rentalProperties.map((prop) => {
     const income = prop.rents;
     const expenses =
       (prop.advertising ?? 0) +
@@ -323,11 +324,10 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
       (prop.taxes ?? 0) +
       (prop.utilities ?? 0) +
       (prop.depreciation ?? 0) +
-      ((prop.otherExpenses ?? []).reduce((a, e) => a + e.amount, 0));
-    const net = income - expenses;
-    // Passive activity loss rules: rental losses limited to $25k if AGI < $150k
-    return s + net;
-  }, 0);
+      (prop.otherExpenses ?? []).reduce((a, e) => a + e.amount, 0);
+    return income - expenses;
+  });
+  const scheduleE_grossNet = rentalNetPerProperty.reduce((a, b) => a + b, 0);
 
   // 1099-MISC other income
   const miscOtherIncome = input.form1099MISC.reduce(
@@ -365,7 +365,7 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     iraDistributions +
     pensionAnnuities +
     scheduleC_grossProfit +
-    scheduleE_net +
+    scheduleE_grossNet +
     miscOtherIncome +
     nec1099Income +
     foreignIncomeIncluded;
@@ -411,6 +411,35 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   const adjustedGrossIncome = agiWithoutSS + taxableSS;
   const totalIncome = totalIncomeBeforeSS + taxableSS;
 
+  // ── Passive Activity Loss (PAL) Limitation — IRC §469(i) ───────────────────
+  // Active participation rental losses deductible up to $25,000 against ordinary income.
+  // Phase-out: $1 per $2 of AGI above $100,000; fully phased out at $150,000.
+  // MFS filers living apart all year get $12,500/$50,000 thresholds; otherwise $0.
+  let scheduleE_net = scheduleE_grossNet;
+  if (scheduleE_grossNet < 0) {
+    const rentalLoss = -scheduleE_grossNet;
+    let palAllowance: number;
+    if (fs === "married_filing_separately") {
+      // MFS living together = $0 allowance; living apart = $12,500 phased from $50k
+      // Conservative: use $0 for MFS (most common case)
+      palAllowance = 0;
+    } else {
+      const palMax = 25_000;
+      const palPhaseoutStart = 100_000;
+      const palPhaseoutEnd = 150_000;
+      if (adjustedGrossIncome <= palPhaseoutStart) {
+        palAllowance = palMax;
+      } else if (adjustedGrossIncome >= palPhaseoutEnd) {
+        palAllowance = 0;
+      } else {
+        palAllowance = palMax - ((adjustedGrossIncome - palPhaseoutStart) / 2);
+      }
+    }
+    const allowedLoss = Math.min(rentalLoss, palAllowance);
+    scheduleE_net = -allowedLoss;
+    // Note: disallowed losses carry forward (not tracked here yet)
+  }
+
   // ── Traditional IRA Deductibility ──────────────────────────────────────────
   const isActivePlanParticipant = input.w2Income.some((_) => true); // simplification
   let traditionalIRADeductible = 0;
@@ -426,40 +455,41 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     traditionalIRADeductible = input.retirementContributions.traditionalIRA;
   }
 
-  // ── Step 4: Deductions ──────────────────────────────────────────────────────
-  let standardOrItemized: number;
-  let isItemized = false;
-  let saltPaid = 0;
+  // ── Step 4: Deductions — always compute both, pick the larger ──────────────
+  // MFS SALT cap is $5,000 (half of the $10,000 for other statuses)
+  const saltCap = fs === "married_filing_separately" ? 5_000 : C.SALT_CAP;
 
-  if (input.itemize) {
-    // Schedule A
-    const stateLocalTax = Math.min(input.stateLocalTaxes ?? 0, C.SALT_CAP);
-    saltPaid = stateLocalTax;
-    const propertyTax = Math.min(input.homeOwnership?.propertyTaxes ?? 0, C.SALT_CAP - stateLocalTax);
-    const totalSALT = Math.min(stateLocalTax + propertyTax, C.SALT_CAP);
-    const mortgageInterest = input.homeOwnership?.mortgageInterest ?? 0;
-    const charitableCash = input.charitableContributions?.cashContributions ?? 0;
-    const charitableNonCash = input.charitableContributions?.nonCashContributions ?? 0;
-    const charitableCarryover = input.charitableContributions?.carryoverFromPrior ?? 0;
-    // Medical: deductible above 7.5% AGI
-    const medicalThreshold = adjustedGrossIncome * 0.075;
-    const medicalDeductible = clamp(
-      (input.medicalExpenses?.totalMedicalExpenses ?? 0) - medicalThreshold
-    );
-    const scheduleATotal =
-      totalSALT +
-      mortgageInterest +
-      charitableCash +
-      charitableNonCash +
-      charitableCarryover +
-      medicalDeductible +
-      (input.casualtyLosses ?? 0);
-    standardOrItemized = scheduleATotal;
-    isItemized = scheduleATotal > C.STANDARD_DEDUCTION[fs];
-    if (!isItemized) standardOrItemized = C.STANDARD_DEDUCTION[fs];
-  } else {
-    standardOrItemized = C.STANDARD_DEDUCTION[fs];
-  }
+  const stateLocalTax = Math.min(input.stateLocalTaxes ?? 0, saltCap);
+  const propertyTaxCapped = Math.min(
+    input.homeOwnership?.propertyTaxes ?? 0,
+    saltCap - stateLocalTax
+  );
+  const totalSALT = stateLocalTax + propertyTaxCapped;
+  const mortgageInterest =
+    (input.homeOwnership?.mortgageInterest ?? 0) +
+    (input.homeOwnership?.pointsPaid ?? 0);
+  const charitableCash = input.charitableContributions?.cashContributions ?? 0;
+  const charitableNonCash =
+    input.charitableContributions?.nonCashContributions ?? 0;
+  const charitableCarryover =
+    input.charitableContributions?.carryoverFromPrior ?? 0;
+  const medicalThreshold = adjustedGrossIncome * 0.075;
+  const medicalDeductible = clamp(
+    (input.medicalExpenses?.totalMedicalExpenses ?? 0) - medicalThreshold
+  );
+  const scheduleATotal =
+    totalSALT +
+    mortgageInterest +
+    charitableCash +
+    charitableNonCash +
+    charitableCarryover +
+    medicalDeductible +
+    (input.casualtyLosses ?? 0);
+
+  const standardDeduction = C.STANDARD_DEDUCTION[fs];
+  const isItemized = scheduleATotal > standardDeduction;
+  const standardOrItemized = isItemized ? scheduleATotal : standardDeduction;
+  const saltPaid = isItemized ? totalSALT : 0;
 
   // QBI Deduction (Section 199A)
   const qbiNetIncome = Math.max(0, scheduleC_grossProfit + nec1099Income + scheduleE_net);

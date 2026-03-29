@@ -434,6 +434,230 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
         )}
       </div>
 
+      {/* Schedule C — Self-Employment Business */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button onClick={() => toggle("scheduleC")} className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🏢</span>
+            <div className="text-left">
+              <div className="font-medium text-gray-900">Schedule C (Self-Employment / Business)</div>
+              <div className="text-xs text-gray-400">{input.scheduleC.length} business(es) · {money(input.scheduleC.reduce((s,b)=>s+b.grossReceipts,0))} gross</div>
+            </div>
+          </div>
+          <span className="text-gray-400">{openSection === "scheduleC" ? "▲" : "▼"}</span>
+        </button>
+        {openSection === "scheduleC" && (
+          <div className="border-t border-gray-100 p-5 space-y-4 bg-gray-50">
+            <p className="text-xs text-gray-500">For freelancers, consultants, sole proprietors, and gig workers. One Schedule C per business. Self-employment tax (15.3%) applies automatically.</p>
+            {input.scheduleC.map((biz, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm text-gray-800">Business #{i + 1}</span>
+                  <button onClick={() => update({ scheduleC: input.scheduleC.filter((_, idx) => idx !== i) })} className="text-red-400 text-xs hover:text-red-600">Remove</button>
+                </div>
+                {/* Business info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Business Name / Activity</label>
+                    <input type="text" value={biz.businessName} onChange={e => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, businessName: e.target.value} : b) })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Freelance Web Development" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Principal Business Code</label>
+                    <input type="text" value={biz.businessCode} onChange={e => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, businessCode: e.target.value} : b) })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="541511" />
+                    <p className="text-xs text-gray-400 mt-0.5">IRS Schedule C instructions, Part II</p>
+                  </div>
+                  <NumberInput label="Gross Receipts / Sales" value={biz.grossReceipts} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, grossReceipts: v} : b) })} />
+                  <NumberInput label="Returns & Allowances" value={biz.returns ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, returns: v} : b) })} />
+                  <NumberInput label="Cost of Goods Sold" value={biz.costOfGoods ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, costOfGoods: v} : b) })} />
+                  <NumberInput label="Other Income" value={biz.otherIncome ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, otherIncome: v} : b) })} />
+                </div>
+                {/* Expenses */}
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Business Expenses</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <NumberInput label="Advertising" value={biz.advertising ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, advertising: v} : b) })} />
+                    <NumberInput label="Commissions & Fees" value={biz.commissions ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, commissions: v} : b) })} />
+                    <NumberInput label="Contract Labor" value={biz.contractLabor ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, contractLabor: v} : b) })} />
+                    <NumberInput label="Depreciation (Form 4562)" value={biz.depreciation ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, depreciation: v} : b) })} />
+                    <NumberInput label="Insurance" value={biz.insurance ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, insurance: v} : b) })} />
+                    <NumberInput label="Legal & Professional" value={biz.legal ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, legal: v} : b) })} />
+                    <NumberInput label="Office Expense" value={biz.officeExpense ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, officeExpense: v} : b) })} />
+                    <NumberInput label="Rent / Lease (Equipment)" value={biz.rentLeaseMachinery ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, rentLeaseMachinery: v} : b) })} />
+                    <NumberInput label="Rent / Lease (Other)" value={biz.rentLeaseOther ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, rentLeaseOther: v} : b) })} />
+                    <NumberInput label="Repairs & Maintenance" value={biz.repairs ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, repairs: v} : b) })} />
+                    <NumberInput label="Supplies" value={biz.supplies ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, supplies: v} : b) })} />
+                    <NumberInput label="Taxes & Licenses" value={biz.taxesLicenses ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, taxesLicenses: v} : b) })} />
+                    <NumberInput label="Travel" value={biz.travel ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, travel: v} : b) })} />
+                    <NumberInput label="Meals (50% deductible)" value={biz.meals ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, meals: v} : b) })} hint="Enter full amount — we apply 50%" />
+                    <NumberInput label="Utilities" value={biz.utilities ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, utilities: v} : b) })} />
+                    <NumberInput label="Wages (employees)" value={biz.wages ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, wages: v} : b) })} />
+                  </div>
+                </div>
+                {/* Vehicle */}
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Vehicle / Mileage</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <NumberInput label="Business Miles Driven" value={biz.vehicleMiles ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, vehicleMiles: v} : b) })} hint="IRS rate: $0.70/mile for 2025" />
+                    <NumberInput label="— OR — Actual Car/Truck Expense" value={biz.carTruck ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, carTruck: v, vehicleMiles: 0} : b) })} hint="Use one or the other, not both" />
+                  </div>
+                </div>
+                {/* Home Office */}
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-3 uppercase tracking-wide">Home Office (Form 8829)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Home Office Area (sq ft)</label>
+                      <input type="number" min="0" value={biz.homeOfficeSqFt ?? ""} onChange={e => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, homeOfficeSqFt: parseInt(e.target.value)||0} : b) })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Total Home Area (sq ft)</label>
+                      <input type="number" min="0" value={biz.totalHomeSqFt ?? ""} onChange={e => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, totalHomeSqFt: parseInt(e.target.value)||0} : b) })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <NumberInput label="Indirect Expenses (rent, utilities, etc.)" value={biz.homeOfficeIndirect ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, homeOfficeIndirect: v} : b) })} />
+                    <NumberInput label="Direct Expenses (exclusive to office)" value={biz.homeOfficeDirect ?? 0} onChange={v => update({ scheduleC: input.scheduleC.map((b,idx) => idx===i ? {...b, homeOfficeDirect: v} : b) })} />
+                  </div>
+                </div>
+                {/* Net preview */}
+                <div className="bg-blue-50 rounded-lg p-3 text-sm">
+                  {(() => {
+                    const gross = biz.grossReceipts - (biz.returns ?? 0) - (biz.costOfGoods ?? 0);
+                    const expenses = (biz.advertising??0)+(biz.commissions??0)+(biz.contractLabor??0)+(biz.depreciation??0)+(biz.insurance??0)+(biz.legal??0)+(biz.officeExpense??0)+(biz.rentLeaseMachinery??0)+(biz.rentLeaseOther??0)+(biz.repairs??0)+(biz.supplies??0)+(biz.taxesLicenses??0)+(biz.travel??0)+((biz.meals??0)*0.5)+(biz.utilities??0)+(biz.wages??0)+((biz.vehicleMiles??0)*0.70)+((biz.homeOfficeSqFt&&biz.totalHomeSqFt) ? (biz.homeOfficeSqFt/biz.totalHomeSqFt)*(biz.homeOfficeIndirect??0)+(biz.homeOfficeDirect??0) : 0);
+                    const net = gross - expenses;
+                    return <span className={net >= 0 ? "text-blue-700" : "text-red-600"}>Estimated net profit: <strong>{net >= 0 ? money(net) : `-${money(-net)}`}</strong></span>;
+                  })()}
+                </div>
+              </div>
+            ))}
+            <button onClick={() => update({ scheduleC: [...input.scheduleC, { businessName: "", businessCode: "", principalProductOrService: "", grossReceipts: 0 }] })}
+              className="w-full border-2 border-dashed border-blue-200 rounded-xl py-3 text-blue-600 text-sm font-medium hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              + Add Business (Schedule C)
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Schedule E — Rental Properties */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button onClick={() => toggle("rental")} className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🏠</span>
+            <div className="text-left">
+              <div className="font-medium text-gray-900">Schedule E (Rental Properties)</div>
+              <div className="text-xs text-gray-400">{input.rentalProperties.length} propert(y/ies) · {money(input.rentalProperties.reduce((s,p)=>s+p.rents,0))} gross rent</div>
+            </div>
+          </div>
+          <span className="text-gray-400">{openSection === "rental" ? "▲" : "▼"}</span>
+        </button>
+        {openSection === "rental" && (
+          <div className="border-t border-gray-100 p-5 space-y-4 bg-gray-50">
+            <p className="text-xs text-gray-500">Rental losses are limited to $25,000/year if AGI ≤ $100,000, phased out at $150,000 (passive activity loss rules).</p>
+            {input.rentalProperties.map((prop, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm text-gray-800">Property #{i + 1}</span>
+                  <button onClick={() => update({ rentalProperties: input.rentalProperties.filter((_, idx) => idx !== i) })} className="text-red-400 text-xs hover:text-red-600">Remove</button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Property Address</label>
+                    <input type="text" value={prop.address} onChange={e => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, address: e.target.value} : p) })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="123 Main St, Seattle, WA" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Days Rented</label>
+                    <input type="number" min="0" max="365" value={prop.daysRented} onChange={e => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, daysRented: parseInt(e.target.value)||0} : p) })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Days Personal Use</label>
+                    <input type="number" min="0" max="365" value={prop.daysPersonalUse} onChange={e => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, daysPersonalUse: parseInt(e.target.value)||0} : p) })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <NumberInput label="Gross Rents Received" value={prop.rents} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, rents: v} : p) })} />
+                  <NumberInput label="Advertising" value={prop.advertising ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, advertising: v} : p) })} />
+                  <NumberInput label="Insurance" value={prop.insurance ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, insurance: v} : p) })} />
+                  <NumberInput label="Mortgage Interest" value={prop.mortgageInterest ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, mortgageInterest: v} : p) })} />
+                  <NumberInput label="Property Taxes" value={prop.taxes ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, taxes: v} : p) })} />
+                  <NumberInput label="Repairs & Maintenance" value={prop.repairs ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, repairs: v} : p) })} />
+                  <NumberInput label="Depreciation" value={prop.depreciation ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, depreciation: v} : p) })} hint="Residential: 27.5 yr straight-line" />
+                  <NumberInput label="Management Fees" value={prop.managementFees ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, managementFees: v} : p) })} />
+                  <NumberInput label="Utilities" value={prop.utilities ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, utilities: v} : p) })} />
+                  <NumberInput label="Cleaning & Maintenance" value={prop.cleaning ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, cleaning: v} : p) })} />
+                  <NumberInput label="Prior Year Passive Losses Carried Forward" value={prop.priorYearPassiveLosses ?? 0} onChange={v => update({ rentalProperties: input.rentalProperties.map((p,idx) => idx===i ? {...p, priorYearPassiveLosses: v} : p) })} />
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 text-sm">
+                  {(() => {
+                    const expenses = (prop.advertising??0)+(prop.insurance??0)+(prop.mortgageInterest??0)+(prop.taxes??0)+(prop.repairs??0)+(prop.depreciation??0)+(prop.managementFees??0)+(prop.utilities??0)+(prop.cleaning??0);
+                    const net = prop.rents - expenses;
+                    return <span className={net >= 0 ? "text-blue-700" : "text-amber-700"}>Net rental income: <strong>{net >= 0 ? money(net) : `-${money(-net)}`}</strong>{net < 0 ? " (loss — subject to PAL rules)" : ""}</span>;
+                  })()}
+                </div>
+              </div>
+            ))}
+            <button onClick={() => update({ rentalProperties: [...input.rentalProperties, { address: "", daysRented: 365, daysPersonalUse: 0, rents: 0 }] })}
+              className="w-full border-2 border-dashed border-blue-200 rounded-xl py-3 text-blue-600 text-sm font-medium hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              + Add Rental Property
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Foreign Income */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button onClick={() => toggle("foreign")} className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🌍</span>
+            <div className="text-left">
+              <div className="font-medium text-gray-900">Foreign Income / Expat</div>
+              <div className="text-xs text-gray-400">{input.foreignIncome ? `${input.foreignIncome.country} · ${money(input.foreignIncome.foreignWages)}` : "Not entered"}</div>
+            </div>
+          </div>
+          <span className="text-gray-400">{openSection === "foreign" ? "▲" : "▼"}</span>
+        </button>
+        {openSection === "foreign" && (
+          <div className="border-t border-gray-100 p-5 bg-gray-50 space-y-4">
+            <p className="text-xs text-gray-500">US citizens and resident aliens must report worldwide income. The Foreign Earned Income Exclusion (Form 2555) may exclude up to $130,000 of foreign wages if you qualify.</p>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Country</label>
+                  <input type="text" value={input.foreignIncome?.country ?? ""} onChange={e => update({ foreignIncome: { ...input.foreignIncome, country: e.target.value, foreignWages: input.foreignIncome?.foreignWages ?? 0, foreignTaxPaid: input.foreignIncome?.foreignTaxPaid ?? 0, excludedUnderFEIE: input.foreignIncome?.excludedUnderFEIE ?? false } })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Germany" />
+                </div>
+                <NumberInput label="Foreign Wages / Salary" value={input.foreignIncome?.foreignWages ?? 0}
+                  onChange={v => update({ foreignIncome: { country: input.foreignIncome?.country ?? "", foreignWages: v, foreignTaxPaid: input.foreignIncome?.foreignTaxPaid ?? 0, excludedUnderFEIE: input.foreignIncome?.excludedUnderFEIE ?? false } })} />
+                <NumberInput label="Foreign Taxes Paid (Form 1116 credit)" value={input.foreignIncome?.foreignTaxPaid ?? 0}
+                  onChange={v => update({ foreignIncome: { ...input.foreignIncome, country: input.foreignIncome?.country ?? "", foreignWages: input.foreignIncome?.foreignWages ?? 0, foreignTaxPaid: v, excludedUnderFEIE: input.foreignIncome?.excludedUnderFEIE ?? false } })} />
+              </div>
+              <label className="flex items-center gap-2 text-sm mt-2">
+                <input type="checkbox" checked={input.foreignIncome?.excludedUnderFEIE ?? false}
+                  onChange={e => update({ foreignIncome: { country: input.foreignIncome?.country ?? "", foreignWages: input.foreignIncome?.foreignWages ?? 0, foreignTaxPaid: input.foreignIncome?.foreignTaxPaid ?? 0, excludedUnderFEIE: e.target.checked } })} />
+                Exclude under Foreign Earned Income Exclusion (Form 2555) — bona fide residence or physical presence test met
+              </label>
+              {input.foreignIncome?.excludedUnderFEIE && (
+                <div className="text-xs text-green-700 bg-green-50 p-2 rounded">
+                  Up to $130,000 of your foreign wages will be excluded from US taxable income. You still owe self-employment tax on excluded earnings if self-employed.
+                </div>
+              )}
+              {!input.foreignIncome?.excludedUnderFEIE && (input.foreignIncome?.foreignTaxPaid ?? 0) > 0 && (
+                <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded">
+                  Foreign taxes paid will be applied as a credit (Form 1116) against your US tax liability.
+                </div>
+              )}
+              {(input.foreignIncome?.foreignWages ?? 0) === 0 && (
+                <button onClick={() => update({ foreignIncome: undefined })} className="text-xs text-red-400 hover:text-red-600 mt-1">
+                  Clear foreign income
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Estimated tax payments */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <h3 className="font-medium text-gray-800 mb-3">Estimated Tax Payments</h3>

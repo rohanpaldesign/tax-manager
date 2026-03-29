@@ -40,7 +40,7 @@ const emptyInput: TaxReturnInput = {
   scheduleC: [],
   rentalProperties: [],
   capitalAssetSales: [],
-  itemize: false,
+  itemize: true, // always compute itemized; calculator picks whichever is larger
   retirementContributions: {
     traditionalIRA: 0,
     rothIRA: 0,

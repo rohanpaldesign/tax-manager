@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createTaxReturn, listTaxReturns } from "@/lib/db/returns";
+import { initDb } from "@/lib/db/client";
 import { calculateTaxes } from "@/lib/tax-engine";
-import { cookies } from "next/headers";
+import { TaxReturnInputSchema } from "@/lib/validation";
 import { randomUUID } from "crypto";
 
 function getOrCreateSessionKey(req: NextRequest): string {
@@ -9,6 +10,7 @@ function getOrCreateSessionKey(req: NextRequest): string {
 }
 
 export async function GET(req: NextRequest) {
+  await initDb();
   const sessionKey = getOrCreateSessionKey(req);
   const returns = await listTaxReturns(sessionKey);
   return NextResponse.json({ returns });
@@ -16,6 +18,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await initDb();
     const sessionKey = getOrCreateSessionKey(req);
     const body = await req.json();
     const { input } = body;
@@ -24,14 +27,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "input is required" }, { status: 400 });
     }
 
-    const id = await createTaxReturn(sessionKey, input);
-    const result = calculateTaxes(input);
+    const parsed = TaxReturnInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const result = calculateTaxes(parsed.data);
+    const id = await createTaxReturn(sessionKey, parsed.data, result);
 
     const response = NextResponse.json({ id, result }, { status: 201 });
     response.cookies.set("session_key", sessionKey, {
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365, // 1 year
+      maxAge: 60 * 60 * 24 * 365,
     });
     return response;
   } catch (err) {
