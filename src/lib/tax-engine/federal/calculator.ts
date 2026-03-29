@@ -127,6 +127,7 @@ function computeEITC(
   filingStatus: FilingStatus,
   investmentIncome: number
 ): number {
+  if (earnedIncome <= 0) return 0;
   if (investmentIncome > C.EITC_MAX_INVESTMENT_INCOME) return 0;
   const children = Math.min(numChildren, 3);
   const row = C.EITC_RATES[children];
@@ -518,8 +519,9 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   const alternativeMinimumTax = clamp(tentativeMinTax - regularTax);
 
   // ── Step 7: Other Taxes ────────────────────────────────────────────────────
+  // Qualified dividends are a subset of total ordinary dividends — use ordinary only to avoid double-counting
   const netInvestmentIncome = clamp(
-    totalOrdinaryDividends + qualifiedDividends + netCapitalGain + scheduleE_net
+    totalOrdinaryDividends + netCapitalGain + scheduleE_net
   );
   const niitThreshold = C.NIIT_THRESHOLD[fs];
   const netInvestmentIncomeTax =
