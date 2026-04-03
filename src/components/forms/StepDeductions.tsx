@@ -107,6 +107,18 @@ export function StepDeductions({ input, update, onNext, onBack }: Props) {
         </div>
       </div>
 
+      {/* Estimated Tax Payments */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+        <h3 className="font-semibold text-gray-800">Tax Payments Already Made</h3>
+        <p className="text-xs text-gray-400">Enter any estimated tax payments you sent to the IRS during 2025, and any 2024 overpayment you applied to 2025.</p>
+        <div className="grid grid-cols-2 gap-4">
+          <NumberInput label="Quarterly Estimated Payments (Form 1040-ES)" value={input.estimatedTaxPayments}
+            onChange={v => update({ estimatedTaxPayments: v })} hint="Total of all 4 quarterly payments made in 2025" />
+          <NumberInput label="2024 Overpayment Applied to 2025" value={input.priorYearOverpaymentApplied ?? 0}
+            onChange={v => update({ priorYearOverpaymentApplied: v })} hint="From your 2024 return, if you applied it forward" />
+        </div>
+      </div>
+
       {/* Retirement Contributions */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
         <h3 className="font-semibold text-gray-800">Retirement Contributions</h3>

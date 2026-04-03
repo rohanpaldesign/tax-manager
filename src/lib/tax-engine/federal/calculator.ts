@@ -395,6 +395,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   const studentLoanInt = clamp(input.studentLoanInterest?.interestPaid ?? 0, 0, 2_500);
   const earlyWithdrawalPenalty = input.earlyWithdrawalPenalties ?? 0;
   const alimonyPaid = input.alimonyPaid ?? 0;
+  // HSA deduction (Form 8889) — only for contributions made directly to HSA, not pre-tax payroll
+  const hsaDeduction = input.retirementContributions.hsa;
 
   const totalAdjustments =
     seDeduction +
@@ -402,7 +404,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     sepIRADeduction +
     studentLoanInt +
     earlyWithdrawalPenalty +
-    alimonyPaid;
+    alimonyPaid +
+    hsaDeduction;
 
   // First-pass AGI (SS not yet included)
   const agiWithoutSS = totalIncomeBeforeSS - totalAdjustments;

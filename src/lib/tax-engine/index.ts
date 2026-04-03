@@ -36,7 +36,7 @@ export function calculateTaxes(input: TaxReturnInput): TaxCalculationResult {
   const state = input.stateOfResidence ?? input.stateTaxInfo?.state;
 
   if (state === "CA") {
-    stateResult = calculateCATax(input, federal.adjustedGrossIncome);
+    stateResult = calculateCATax(input, federal.adjustedGrossIncome, federal.socialSecurityTaxable);
   } else if (state === "PA") {
     stateResult = calculatePATax(input, federal.adjustedGrossIncome);
   } else if (state === "WA") {

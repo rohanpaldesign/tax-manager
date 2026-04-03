@@ -106,20 +106,19 @@ function applyBrackets(
 
 export function calculateCATax(
   input: TaxReturnInput,
-  federalAGI: number
+  federalAGI: number,
+  federalTaxableSS: number = 0
 ): StateTaxResult {
   const fs = input.filingStatus;
 
   // CA conforms to federal AGI with adjustments:
-  // + Federal bonus depreciation (CA uses own depreciation schedule)
-  // - CA does NOT allow HSA deduction
-  // - CA does NOT tax Social Security
-  // + CA adds back certain federal deductions
-  // For simplicity, start with federal AGI
+  // - CA does NOT tax Social Security (subtract taxable SS included in federal AGI)
+  // - CA does NOT allow HSA deduction (add back)
+  // - CA does NOT allow federal bonus depreciation (CA uses its own schedule)
   let caAGI = federalAGI;
 
-  // CA does not tax Social Security — subtract taxable SS that was included
-  // (handled implicitly since we start from total income; in full impl, adjust here)
+  // CA does not tax Social Security
+  caAGI -= federalTaxableSS;
 
   // CA does not allow HSA deduction
   const hsaAddback = input.retirementContributions.hsa;
