@@ -30,6 +30,7 @@ const emptyDependent: DependentInfo = {
 };
 
 export function StepCredits({ input, update, onNext, onBack }: Props) {
+  const state = input.stateOfResidence ?? input.stateTaxInfo?.state;
   const addDependent = () => update({ dependents: [...input.dependents, { ...emptyDependent }] });
   const updateDep = (i: number, patch: Partial<DependentInfo>) => {
     update({ dependents: input.dependents.map((d, idx) => idx === i ? { ...d, ...patch } : d) });
@@ -178,6 +179,55 @@ export function StepCredits({ input, update, onNext, onBack }: Props) {
           Purchased a qualifying electric vehicle in 2025 (Form 8936 — up to $7,500 credit)
         </label>
       </div>
+
+      {/* State-Specific Credits */}
+      {state === "CA" && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <h3 className="font-semibold text-gray-800">California State Credits</h3>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input type="checkbox" className="mt-0.5"
+                checked={!!input.stateTaxInfo?.caRenterCredit}
+                onChange={e => update({ stateTaxInfo: { ...input.stateTaxInfo, state: "CA", residencyStatus: input.stateTaxInfo?.residencyStatus ?? input.residencyStatus, caRenterCredit: e.target.checked } })} />
+              <div>
+                <span className="font-medium text-gray-800">Renter's Credit</span>
+                <p className="text-xs text-gray-400 mt-0.5">Did you rent (not own) your CA home for more than half of 2025? Single: $60 credit · MFJ: $120 credit. Income limit applies (~$50k single / ~$100k MFJ).</p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input type="checkbox" className="mt-0.5"
+                checked={!!input.stateTaxInfo?.caYoungChildCredit}
+                onChange={e => update({ stateTaxInfo: { ...input.stateTaxInfo, state: "CA", residencyStatus: input.stateTaxInfo?.residencyStatus ?? input.residencyStatus, caYoungChildCredit: e.target.checked } })} />
+              <div>
+                <span className="font-medium text-gray-800">Young Child Tax Credit</span>
+                <p className="text-xs text-gray-400 mt-0.5">$1,117 per qualifying child under age 6 as of December 31, 2025. We'll count eligible dependents automatically.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {state === "PA" && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <h3 className="font-semibold text-gray-800">Pennsylvania Local Taxes</h3>
+          <p className="text-xs text-gray-400">PA municipalities levy a local Earned Income Tax (EIT) in addition to state tax. This is separate from PA Form PA-40.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <NumberInput label="Local EIT Amount Owed (from local return)" value={input.stateTaxInfo?.paLocalEIT ?? 0}
+              onChange={v => update({ stateTaxInfo: { ...input.stateTaxInfo, state: "PA", residencyStatus: input.stateTaxInfo?.residencyStatus ?? input.residencyStatus, paLocalEIT: v } })}
+              hint="From your local earned income tax return (CLGS-32-1)" />
+            <NumberInput label="Local EIT Already Withheld (W-2 Box 19)" value={input.stateTaxInfo?.paLocalWithheld ?? 0}
+              onChange={v => update({ stateTaxInfo: { ...input.stateTaxInfo, state: "PA", residencyStatus: input.stateTaxInfo?.residencyStatus ?? input.residencyStatus, paLocalWithheld: v } })}
+              hint="From your W-2 Box 19 or pay stubs" />
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">School District</label>
+              <input type="text" value={input.stateTaxInfo?.paSchoolDistrict ?? ""}
+                onChange={e => update({ stateTaxInfo: { ...input.stateTaxInfo, state: "PA", residencyStatus: input.stateTaxInfo?.residencyStatus ?? input.residencyStatus, paSchoolDistrict: e.target.value } })}
+                placeholder="e.g. Philadelphia City SD"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Direct Deposit */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
