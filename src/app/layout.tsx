@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import AppNav from "@/components/layout/AppNav";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,7 +19,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="h-full">
-      <body className={`${inter.className} min-h-full bg-gray-50 antialiased`}>
+      <body className={`${inter.className} min-h-full bg-gray-50 antialiased`} suppressHydrationWarning>
+        <AppNav />
         {children}
       </body>
     </html>
