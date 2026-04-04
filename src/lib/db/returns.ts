@@ -6,6 +6,8 @@ export interface TaxReturn {
   id: string;
   taxYear: number;
   sessionKey: string;
+  userId?: string;
+  stage: number;
   status: "draft" | "complete";
   input: TaxReturnInput;
   result?: TaxCalculationResult;
@@ -16,17 +18,21 @@ export interface TaxReturn {
 export async function createTaxReturn(
   sessionKey: string,
   input: TaxReturnInput,
-  result?: TaxCalculationResult
+  result?: TaxCalculationResult,
+  userId?: string | null,
+  stage = 1
 ): Promise<string> {
   const id = randomUUID();
   const db = getDb();
   if (!db) return id; // stateless mode — return id without persisting
   await db.execute({
-    sql: `INSERT INTO tax_returns (id, session_key, input_json, result_json, status)
-          VALUES (?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO tax_returns (id, session_key, user_id, stage, input_json, result_json, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [
       id,
       sessionKey,
+      userId ?? null,
+      stage,
       JSON.stringify(input),
       result ? JSON.stringify(result) : null,
       result ? "complete" : "draft",
@@ -98,6 +104,8 @@ function rowToTaxReturn(row: Record<string, unknown>): TaxReturn {
     id: row.id as string,
     taxYear: row.tax_year as number,
     sessionKey: row.session_key as string,
+    userId: row.user_id as string | undefined,
+    stage: (row.stage as number) ?? 1,
     status: row.status as "draft" | "complete",
     input: JSON.parse(row.input_json as string),
     result: row.result_json

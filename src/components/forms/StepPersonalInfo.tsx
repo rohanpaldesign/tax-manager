@@ -6,6 +6,10 @@ interface Props {
   input: TaxReturnInput;
   update: (patch: Partial<TaxReturnInput>) => void;
   onNext: () => void;
+  hideResidency?: boolean;
+  computedResidencyLabel?: string;
+  computedResidencyForm?: string;
+  onChangeResidency?: () => void;
 }
 
 const FILING_STATUSES: { value: FilingStatus; label: string; desc: string }[] = [
@@ -28,7 +32,7 @@ const STATES: { value: StateCode; label: string }[] = [
   { value: "WA", label: "Washington" },
 ];
 
-export function StepPersonalInfo({ input, update, onNext }: Props) {
+export function StepPersonalInfo({ input, update, onNext, hideResidency, computedResidencyLabel, computedResidencyForm, onChangeResidency }: Props) {
   const isMFJ = input.filingStatus === "married_filing_jointly" || input.filingStatus === "married_filing_separately";
 
   const isValid =
@@ -50,8 +54,14 @@ export function StepPersonalInfo({ input, update, onNext }: Props) {
       {/* Filing Status */}
       <section>
         <h3 className="font-semibold text-gray-800 mb-3">Filing Status</h3>
+        {input.residencyStatus === "nonresident" && (
+          <p className="text-xs text-amber-600 mb-2">Note: Nonresident aliens cannot use Married Filing Jointly or Head of Household status.</p>
+        )}
         <div className="space-y-2">
-          {FILING_STATUSES.map((fs) => (
+          {FILING_STATUSES.filter((fs) =>
+            input.residencyStatus !== "nonresident" ||
+            !["married_filing_jointly", "head_of_household"].includes(fs.value)
+          ).map((fs) => (
             <label
               key={fs.value}
               className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors
@@ -231,34 +241,66 @@ export function StepPersonalInfo({ input, update, onNext }: Props) {
       </section>
 
       {/* Residency */}
-      <section>
-        <h3 className="font-semibold text-gray-800 mb-3">Residency Status</h3>
-        <div className="space-y-2">
-          {RESIDENCY_STATUSES.map((rs) => (
-            <label
-              key={rs.value}
-              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors
-                ${input.residencyStatus === rs.value
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300 bg-white"}`}
-            >
-              <input
-                type="radio"
-                name="residencyStatus"
-                value={rs.value}
-                checked={input.residencyStatus === rs.value}
-                onChange={() => update({ residencyStatus: rs.value })}
-              />
-              <span className="text-sm font-medium text-gray-900">{rs.label}</span>
-            </label>
-          ))}
-        </div>
-        {input.residencyStatus === "nonresident" && (
-          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            Non-residents file Form 1040-NR. This tool will still calculate your tax — the PDF output notes this distinction.
+      {hideResidency ? (
+        <section>
+          <h3 className="font-semibold text-gray-800 mb-3">Residency Status</h3>
+          <div className="flex items-start justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div>
+              <p className="text-sm font-semibold text-green-800">{computedResidencyLabel ?? "Determined in Stage 1"}</p>
+              {computedResidencyForm && (
+                <p className="text-xs text-green-700 mt-0.5">Required form: <strong>{computedResidencyForm}</strong></p>
+              )}
+              <p className="text-xs text-green-600 mt-1">Computed from your visa, days present, and travel history.</p>
+            </div>
+            {onChangeResidency && (
+              <button
+                type="button"
+                onClick={onChangeResidency}
+                className="text-xs text-blue-600 hover:underline shrink-0 ml-4"
+              >
+                Change
+              </button>
+            )}
           </div>
-        )}
-      </section>
+        </section>
+      ) : (
+        <section>
+          <h3 className="font-semibold text-gray-800 mb-3">Residency Status</h3>
+          <div className="space-y-2">
+            {RESIDENCY_STATUSES.map((rs) => (
+              <label
+                key={rs.value}
+                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors
+                  ${input.residencyStatus === rs.value
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300 bg-white"}`}
+              >
+                <input
+                  type="radio"
+                  name="residencyStatus"
+                  value={rs.value}
+                  checked={input.residencyStatus === rs.value}
+                  onChange={() => update({ residencyStatus: rs.value })}
+                />
+                <span className="text-sm font-medium text-gray-900">{rs.label}</span>
+              </label>
+            ))}
+          </div>
+          {input.residencyStatus === "nonresident" && (
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 space-y-1">
+              <p className="font-semibold">Nonresident Alien — Form 1040-NR applies</p>
+              <p>Nonresident aliens file Form 1040-NR (not Form 1040). Key differences:</p>
+              <ul className="list-disc list-inside space-y-0.5 mt-1">
+                <li>Standard deduction is <strong>not available</strong> — you may only itemize deductions</li>
+                <li>Filing status is limited to Single, Married Filing Separately, or Qualifying Surviving Spouse</li>
+                <li>Earned Income Credit (EITC) is <strong>not available</strong></li>
+                <li>Income tax treaties with your home country may reduce your U.S. tax — consult IRS Publication 901</li>
+                <li>Form 1040-NR must generally be mailed to Austin, TX (limited e-file options)</li>
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="flex justify-end pt-4">
         <button

@@ -4,6 +4,7 @@ import { initDb } from "@/lib/db/client";
 import { calculateTaxes } from "@/lib/tax-engine";
 import { TaxReturnInputSchema } from "@/lib/validation";
 import { randomUUID } from "crypto";
+import { getSession } from "@/lib/auth/session";
 
 function getOrCreateSessionKey(req: NextRequest): string {
   return req.cookies.get("session_key")?.value ?? randomUUID();
@@ -35,8 +36,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const sessionId = req.cookies.get("tm_session")?.value;
+    let userId: string | null = null;
+    if (sessionId) {
+      const authSession = await getSession(sessionId);
+      if (authSession) userId = authSession.userId;
+    }
+
     const result = calculateTaxes(parsed.data);
-    const id = await createTaxReturn(sessionKey, parsed.data, result);
+    const id = await createTaxReturn(sessionKey, parsed.data, result, userId, 6);
 
     const response = NextResponse.json({ id, result }, { status: 201 });
     response.cookies.set("session_key", sessionKey, {
