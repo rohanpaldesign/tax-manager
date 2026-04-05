@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -28,7 +28,36 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [showAdminAccess, setShowAdminAccess] = useState(false);
+  const [adminCode, setAdminCode] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const adminInputRef = useRef<HTMLInputElement>(null);
+
   const strength = getPasswordStrength(password);
+
+  async function handleAdminAccess() {
+    setAdminError('');
+    setAdminLoading(true);
+    try {
+      const res = await fetch('/api/auth/admin-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: adminCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAdminError(data.error ?? 'Invalid code.');
+        return;
+      }
+      router.push('/admin');
+      router.refresh();
+    } catch {
+      setAdminError('Something went wrong.');
+    } finally {
+      setAdminLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -140,6 +169,43 @@ export default function SignupPage() {
           Log in
         </Link>
       </p>
+
+      <div className="mt-8 text-center">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAdminAccess(!showAdminAccess);
+            if (!showAdminAccess) setTimeout(() => adminInputRef.current?.focus(), 50);
+          }}
+          className="text-xs text-gray-300 hover:text-gray-400 transition-colors"
+        >
+          Admin access
+        </button>
+        {showAdminAccess && (
+          <div className="mt-2 flex gap-2 justify-center">
+            <input
+              ref={adminInputRef}
+              type="text"
+              value={adminCode}
+              onChange={(e) => setAdminCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdminAccess()}
+              placeholder="Access code"
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-300 w-44"
+            />
+            <button
+              type="button"
+              onClick={handleAdminAccess}
+              disabled={adminLoading || !adminCode}
+              className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-40"
+            >
+              {adminLoading ? '…' : 'Enter'}
+            </button>
+          </div>
+        )}
+        {adminError && (
+          <p className="text-xs text-red-500 mt-1">{adminError}</p>
+        )}
+      </div>
     </>
   );
 }
