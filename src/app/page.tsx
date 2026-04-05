@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminAccessButton from "@/components/layout/AdminAccessButton";
 
 const features = [
   {
@@ -116,6 +117,7 @@ export default function HomePage() {
             filing. This tool does not provide legal or financial advice.
           </p>
           <p className="mt-2">Built with Next.js · Hosted on Vercel · Open Source</p>
+          <AdminAccessButton />
         </div>
       </footer>
     </div>

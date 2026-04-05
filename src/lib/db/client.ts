@@ -7,9 +7,10 @@ let _client: Client | null = null;
 export function getDb(): Client | null {
   if (_client) return _client;
   const url = process.env.TURSO_DATABASE_URL;
+  if (!url) return null;
   const authToken = process.env.TURSO_AUTH_TOKEN;
-  if (!url || !authToken) return null;
-  _client = createClient({ url, authToken });
+  // file: URLs don't need an auth token (local SQLite)
+  _client = createClient({ url, authToken: authToken || undefined });
   return _client;
 }
 
