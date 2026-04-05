@@ -66,6 +66,11 @@ export async function initDb(): Promise<void> {
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
   await db.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`);
 
+  // Auto-cleanup: delete draft returns older than 30 days
+  await db.execute(
+    `DELETE FROM tax_returns WHERE status = 'draft' AND created_at < datetime('now', '-30 days')`
+  );
+
   // Migrations — ADD COLUMN is idempotent via try/catch (SQLite has no IF NOT EXISTS for columns)
   try {
     await db.execute(`ALTER TABLE tax_returns ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE SET NULL`);

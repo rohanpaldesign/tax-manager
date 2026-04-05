@@ -5,8 +5,9 @@ import type { TaxReturnInput } from "@/types/tax";
 interface Props {
   input: TaxReturnInput;
   update: (patch: Partial<TaxReturnInput>) => void;
-  onNext: () => void;
-  onBack: () => void;
+  onNext?: () => void;
+  onBack?: () => void;
+  hideFooter?: boolean;
 }
 
 function NumberInput({ label, value, onChange, hint }: { label: string; value: number; onChange: (n: number) => void; hint?: string }) {
@@ -17,13 +18,13 @@ function NumberInput({ label, value, onChange, hint }: { label: string; value: n
       <div className="relative">
         <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
         <input type="number" min="0" step="0.01" value={value || ""} onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
     </div>
   );
 }
 
-export function StepDeductions({ input, update, onNext, onBack }: Props) {
+export function StepDeductions({ input, update, onNext, onBack, hideFooter }: Props) {
   const totalItemized =
     Math.min((input.stateLocalTaxes ?? 0) + (input.homeOwnership?.propertyTaxes ?? 0), 10_000) +
     (input.homeOwnership?.mortgageInterest ?? 0) +
@@ -146,14 +147,16 @@ export function StepDeductions({ input, update, onNext, onBack }: Props) {
         </div>
       )}
 
-      <div className="flex justify-between pt-4">
-        <button onClick={onBack} className="border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-          ← Back
-        </button>
-        <button onClick={onNext} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
-          Continue to Credits →
-        </button>
-      </div>
+      {!hideFooter && (
+        <div className="flex justify-between pt-4">
+          <button onClick={onBack} className="border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">
+            ← Back
+          </button>
+          <button onClick={onNext} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
+            Continue to Credits →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

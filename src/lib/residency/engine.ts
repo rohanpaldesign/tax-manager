@@ -75,7 +75,9 @@ export function determineResidency(input: ResidencyInput): ResidencyResult {
 
   // ── Step 3: Exempt Individual Check ─────────────────────────────────────
   if (hasAnyVisa(input.visaTypes, FM_VISAS)) {
-    const arrivalYear = input.firstFMVisaArrivalYear ?? TAX_YEAR;
+    const arrivalYear = input.firstFMVisaArrivalDate
+      ? new Date(input.firstFMVisaArrivalDate).getFullYear()
+      : TAX_YEAR;
     const yearsOnFM = TAX_YEAR - arrivalYear;
     if (yearsOnFM < 5) {
       return {
@@ -93,7 +95,9 @@ export function determineResidency(input: ResidencyInput): ResidencyResult {
   }
 
   if (hasAnyVisa(input.visaTypes, JQ_VISAS)) {
-    const arrivalYear = input.firstJQVisaArrivalYear ?? TAX_YEAR;
+    const arrivalYear = input.firstJQVisaArrivalDate
+      ? new Date(input.firstJQVisaArrivalDate).getFullYear()
+      : TAX_YEAR;
     const yearsOnJQ = TAX_YEAR - arrivalYear;
     const priorExempt = input.priorJQExemptYears ?? 0;
     if (yearsOnJQ < 2 || priorExempt < 6) {

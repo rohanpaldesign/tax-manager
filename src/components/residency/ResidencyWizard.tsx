@@ -8,45 +8,17 @@ interface Props {
   onComplete: (result: ResidencyResult, input: ResidencyInput) => void;
 }
 
-type WizardStep =
-  | "r1_citizenship"
-  | "r2_green_card"
-  | "r3_visa"
-  | "r4_exempt"
-  | "r5_days"
-  | "r7_nra"
-  | "r9_dual_status"
-  | "result";
-
 const FM_VISAS = ["F-1", "F-2", "M-1", "M-2"];
 const JQ_VISAS = ["J-1", "J-2", "Q-1"];
 const DIPLOMATIC_VISAS = ["A-1", "A-2", "G-1", "G-2", "G-3", "G-4", "G-5"];
 
 const VISA_CATEGORIES = [
-  {
-    label: "Student",
-    visas: ["F-1", "F-2", "M-1", "M-2"],
-  },
-  {
-    label: "Exchange Visitor",
-    visas: ["J-1", "J-2", "Q-1"],
-  },
-  {
-    label: "Work",
-    visas: ["H-1B", "H-1B1", "H-2A", "H-2B", "H-3", "L-1A", "L-1B", "O-1", "O-2", "TN", "E-3"],
-  },
-  {
-    label: "Business / Tourist",
-    visas: ["B-1", "B-2", "B-1/B-2"],
-  },
-  {
-    label: "Diplomatic / Government",
-    visas: ["A-1", "A-2", "G-1", "G-2", "G-3", "G-4", "G-5"],
-  },
-  {
-    label: "Other",
-    visas: ["No visa / ESTA / Visa Waiver Program", "Other (not listed)"],
-  },
+  { label: "Student", visas: ["F-1", "F-2", "M-1", "M-2"] },
+  { label: "Exchange Visitor", visas: ["J-1", "J-2", "Q-1"] },
+  { label: "Work", visas: ["H-1B", "H-1B1", "H-2A", "H-2B", "H-3", "L-1A", "L-1B", "O-1", "O-2", "TN", "E-3"] },
+  { label: "Business / Tourist", visas: ["B-1", "B-2", "B-1/B-2"] },
+  { label: "Diplomatic / Government", visas: ["A-1", "A-2", "G-1", "G-2", "G-3", "G-4", "G-5"] },
+  { label: "Other", visas: ["No visa / ESTA / Visa Waiver Program", "Other (not listed)"] },
 ];
 
 const EXCLUSION_REASONS = [
@@ -80,441 +52,306 @@ const emptyInput: ResidencyInput = {
   excludedDays2023: 0,
 };
 
-function Card({ children }: { children: React.ReactNode }) {
+function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+    <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
+          {n}
+        </span>
+        <h3 className="font-semibold text-gray-900 text-base">{title}</h3>
+      </div>
       {children}
     </div>
   );
 }
 
-function Q({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-xl font-bold text-gray-900 mb-2">{children}</h2>;
-}
-
-function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-gray-500 mb-6">{children}</p>;
-}
-
-function BigRadio({
-  label,
-  desc,
-  checked,
-  onChange,
-}: {
-  label: string;
-  desc?: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
+function RadioPill({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
-    <label
-      className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-colors ${
-        checked
-          ? "border-blue-500 bg-blue-50"
-          : "border-gray-200 bg-white hover:border-gray-300"
-      }`}
-    >
-      <input type="radio" checked={checked} onChange={onChange} className="mt-1" />
-      <div>
-        <div className="font-semibold text-gray-900">{label}</div>
-        {desc && <div className="text-sm text-gray-500 mt-0.5">{desc}</div>}
-      </div>
+    <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-colors
+      ${checked ? "border-blue-500 bg-blue-50 text-blue-800" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"}`}>
+      <input type="radio" className="sr-only" checked={checked} onChange={onChange} />
+      {label}
     </label>
   );
 }
 
-function NextBtn({
-  onClick,
-  disabled,
-}: {
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="mt-8 bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      Continue →
-    </button>
-  );
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-gray-500">{children}</p>;
 }
 
 export function ResidencyWizard({ onComplete }: Props) {
-  const [step, setStep] = useState<WizardStep>("r1_citizenship");
   const [input, setInput] = useState<ResidencyInput>(emptyInput);
-  const [result, setResult] = useState<ResidencyResult | null>(null);
-
-  // Per-year exclusion state (UI only — summed into excludedDaysXXXX)
+  const [citizenAnswered, setCitizenAnswered] = useState(false);
   const [excl2025, setExcl2025] = useState<Record<string, number>>({});
   const [excl2024, setExcl2024] = useState<Record<string, number>>({});
   const [excl2023, setExcl2023] = useState<Record<string, number>>({});
+
+  const upd = (patch: Partial<ResidencyInput>) => setInput((p) => ({ ...p, ...patch }));
 
   function sumExcl(obj: Record<string, number>) {
     return Object.values(obj).reduce((a, b) => a + b, 0);
   }
 
-  function compute(overrides?: Partial<ResidencyInput>): ResidencyResult {
-    const merged: ResidencyInput = {
-      ...input,
-      ...overrides,
-      excludedDays2025: sumExcl(excl2025),
-      excludedDays2024: sumExcl(excl2024),
-      excludedDays2023: sumExcl(excl2023),
-    };
-    return determineResidency(merged);
+  const mergedInput: ResidencyInput = {
+    ...input,
+    excludedDays2025: sumExcl(excl2025),
+    excludedDays2024: sumExcl(excl2024),
+    excludedDays2023: sumExcl(excl2023),
+  };
+
+  // Live result — recomputed on every render
+  const liveResult = citizenAnswered ? determineResidency(mergedInput) : null;
+
+  // Section visibility
+  const showGreenCard = citizenAnswered && !input.isUsCitizen;
+  const showVisa = showGreenCard && input.heldGreenCard === false;
+  const showVisaDates = showVisa && input.visaTypes.length > 0;
+  const hasFM = input.visaTypes.some((v) => FM_VISAS.includes(v));
+  const hasJQ = input.visaTypes.some((v) => JQ_VISAS.includes(v));
+  const hasDiplomatic = input.visaTypes.some((v) => DIPLOMATIC_VISAS.includes(v));
+
+  // Compute whether F/M or J/Q exemption applies (to know if days section is needed)
+  const fmExemptApplies = hasFM && (() => {
+    const d = input.firstFMVisaArrivalDate;
+    const yr = d ? new Date(d).getFullYear() : null;
+    return yr ? (2025 - yr) < 5 : false;
+  })();
+  const jqExemptApplies = hasJQ && (() => {
+    const d = input.firstJQVisaArrivalDate;
+    const yr = d ? new Date(d).getFullYear() : null;
+    if (!yr) return false;
+    const yearsOnJQ = 2025 - yr;
+    return yearsOnJQ < 2 || (input.priorJQExemptYears ?? 0) < 6;
+  })();
+
+  const showDays = showVisa && !hasDiplomatic && !fmExemptApplies && !jqExemptApplies;
+  const showNRA = showVisa && liveResult?.classification === "NONRESIDENT_ALIEN";
+  const showDualStatus = showDays && liveResult !== null &&
+    (liveResult.classification === "DUAL_STATUS" ||
+     (liveResult.classification === "RESIDENT_ALIEN_SPT" && input.usArrivalDate2025 && input.usArrivalDate2025 > "2025-01-01"));
+
+  // Is the form ready to confirm?
+  const canConfirm = liveResult !== null && (
+    input.isUsCitizen ||
+    input.heldGreenCard ||
+    hasDiplomatic ||
+    fmExemptApplies ||
+    jqExemptApplies ||
+    (showNRA && input.hasForeignTaxHome !== undefined) ||
+    (showDays && !showNRA)
+  );
+
+  function handleConfirm() {
+    if (!liveResult) return;
+    onComplete(liveResult, mergedInput);
   }
 
-  function finalize(overrides?: Partial<ResidencyInput>) {
-    const finalInput: ResidencyInput = {
-      ...input,
-      ...overrides,
-      excludedDays2025: sumExcl(excl2025),
-      excludedDays2024: sumExcl(excl2024),
-      excludedDays2023: sumExcl(excl2023),
-    };
-    setInput(finalInput);
-    const r = determineResidency(finalInput);
-    setResult(r);
-    setStep("result");
-  }
+  const sectionNum = (() => {
+    let n = 1;
+    return () => n++;
+  })();
 
-  // ── R-1: Citizenship ─────────────────────────────────────────────────────
-  if (step === "r1_citizenship") {
-    return (
-      <Card>
-        <Q>Are you a US citizen or US national?</Q>
-        <Hint>
-          US nationals (e.g., residents of American Samoa) are treated the same as citizens for federal tax purposes.
-        </Hint>
-        <div className="space-y-3">
-          <BigRadio
-            label="Yes — I am a US citizen or US national"
-            checked={input.isUsCitizen === true}
-            onChange={() => {
-              setInput((p) => ({ ...p, isUsCitizen: true }));
-              const r = determineResidency({ ...input, isUsCitizen: true, heldGreenCard: false, visaTypes: [], grossDays2025: 0, grossDays2024: 0, grossDays2023: 0, excludedDays2025: 0, excludedDays2024: 0, excludedDays2023: 0 });
-              setResult(r);
-              setStep("result");
-            }}
-          />
-          <BigRadio
-            label="No — I am not a US citizen"
-            checked={input.isUsCitizen === false}
-            onChange={() => setInput((p) => ({ ...p, isUsCitizen: false }))}
-          />
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-1">Residency Determination</h2>
+        <p className="text-gray-500 text-sm">Answer each question. Your filing classification is computed automatically and shown at the bottom.</p>
+      </div>
+
+      {/* ── Section 1: Citizenship ─────────────────────────────────────────── */}
+      <Section n={sectionNum()} title="US Citizenship">
+        <Hint>US nationals (e.g., residents of American Samoa) are treated the same as citizens for federal tax purposes.</Hint>
+        <p className="text-sm font-semibold text-gray-800">Are you a US citizen or US national?</p>
+        <div className="flex gap-3">
+          <RadioPill label="Yes — I am a US citizen" checked={citizenAnswered && input.isUsCitizen === true}
+            onChange={() => { upd({ isUsCitizen: true }); setCitizenAnswered(true); }} />
+          <RadioPill label="No — I am not a US citizen" checked={citizenAnswered && input.isUsCitizen === false}
+            onChange={() => { upd({ isUsCitizen: false }); setCitizenAnswered(true); }} />
         </div>
-        <NextBtn
-          onClick={() => setStep("r2_green_card")}
-          disabled={input.isUsCitizen !== false}
-        />
-      </Card>
-    );
-  }
+      </Section>
 
-  // ── R-2: Green Card ──────────────────────────────────────────────────────
-  if (step === "r2_green_card") {
-    return (
-      <Card>
-        <Q>Did you hold a US Green Card (Form I-551) at any point during 2025?</Q>
-        <Hint>A Green Card makes you a Lawful Permanent Resident — taxed like a US citizen regardless of how many days you spent in the US.</Hint>
-        <div className="space-y-3">
-          <BigRadio
-            label="Yes — I held a Green Card in 2025"
-            checked={input.heldGreenCard === true}
-            onChange={() => setInput((p) => ({ ...p, heldGreenCard: true }))}
-          />
+      {/* ── Section 2: Green Card ──────────────────────────────────────────── */}
+      {showGreenCard && (
+        <Section n={sectionNum()} title="Green Card (Lawful Permanent Residency)">
+          <Hint>A Green Card makes you a Lawful Permanent Resident, taxed like a US citizen regardless of how many days you were in the US.</Hint>
+          <p className="text-sm font-semibold text-gray-800">Did you hold a US Green Card (Form I-551) at any point during 2025?</p>
+          <div className="flex gap-3">
+            <RadioPill label="Yes — I held a Green Card" checked={input.heldGreenCard === true}
+              onChange={() => upd({ heldGreenCard: true })} />
+            <RadioPill label="No — I do not have a Green Card" checked={input.heldGreenCard === false}
+              onChange={() => upd({ heldGreenCard: false })} />
+          </div>
           {input.heldGreenCard && (
-            <label className="flex items-start gap-3 ml-8 p-4 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={!!input.formallyAbandonedGreenCard}
-                onChange={(e) =>
-                  setInput((p) => ({ ...p, formallyAbandonedGreenCard: e.target.checked }))
-                }
-              />
+            <label className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl cursor-pointer">
+              <input type="checkbox" className="mt-0.5" checked={!!input.formallyAbandonedGreenCard}
+                onChange={(e) => upd({ formallyAbandonedGreenCard: e.target.checked })} />
               <div className="text-sm text-amber-800">
-                <strong>I formally abandoned my green card in 2025</strong> (filed Form I-407 or submitted a final return as a long-term resident). If checked, you may owe expatriation tax and must file Form 8854.
+                <strong>I formally abandoned my green card in 2025</strong> (filed Form I-407 or submitted a final return as a long-term resident).
+                If checked, you may owe expatriation tax and must file Form 8854.
               </div>
             </label>
           )}
-          <BigRadio
-            label="No — I do not have a Green Card"
-            checked={input.heldGreenCard === false}
-            onChange={() => setInput((p) => ({ ...p, heldGreenCard: false }))}
-          />
-        </div>
-        {input.heldGreenCard ? (
-          <NextBtn onClick={() => finalize()} />
-        ) : (
-          <NextBtn
-            onClick={() => setStep("r3_visa")}
-            disabled={input.heldGreenCard !== false}
-          />
-        )}
-      </Card>
-    );
-  }
+        </Section>
+      )}
 
-  // ── R-3: Visa Type ───────────────────────────────────────────────────────
-  if (step === "r3_visa") {
-    const toggleVisa = (v: string) => {
-      setInput((p) => ({
-        ...p,
-        visaTypes: p.visaTypes.includes(v)
-          ? p.visaTypes.filter((x) => x !== v)
-          : [...p.visaTypes, v],
-      }));
-    };
-
-    return (
-      <Card>
-        <Q>What type of visa did you hold during 2025?</Q>
-        <Hint>Select all that apply. If your visa status changed during the year, check all types you held.</Hint>
-        <div className="space-y-5">
-          {VISA_CATEGORIES.map((cat) => (
-            <div key={cat.label}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                {cat.label}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {cat.visas.map((v) => (
-                  <label
-                    key={v}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
-                      input.visaTypes.includes(v)
-                        ? "border-blue-500 bg-blue-50 text-blue-800 font-medium"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={input.visaTypes.includes(v)}
-                      onChange={() => toggleVisa(v)}
-                    />
-                    {v}
-                  </label>
-                ))}
+      {/* ── Section 3: Visa Type ───────────────────────────────────────────── */}
+      {showVisa && (
+        <Section n={sectionNum()} title="Visa Type">
+          <Hint>Select all visa types you held during 2025. If your status changed, check all that applied.</Hint>
+          <div className="space-y-4">
+            {VISA_CATEGORIES.map((cat) => (
+              <div key={cat.label}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{cat.label}</p>
+                <div className="flex flex-wrap gap-2">
+                  {cat.visas.map((v) => (
+                    <label key={v} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors
+                      ${input.visaTypes.includes(v) ? "border-blue-500 bg-blue-50 text-blue-800 font-medium" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"}`}>
+                      <input type="checkbox" className="sr-only" checked={input.visaTypes.includes(v)}
+                        onChange={() => upd({ visaTypes: input.visaTypes.includes(v) ? input.visaTypes.filter((x) => x !== v) : [...input.visaTypes, v] })} />
+                      {v}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <NextBtn
-          onClick={() => {
-            const needsExemptCheck =
-              input.visaTypes.some((v) => [...FM_VISAS, ...JQ_VISAS, ...DIPLOMATIC_VISAS].includes(v));
-            setStep(needsExemptCheck ? "r4_exempt" : "r5_days");
-          }}
-          disabled={input.visaTypes.length === 0}
-        />
-      </Card>
-    );
-  }
+            ))}
+          </div>
+        </Section>
+      )}
 
-  // ── R-4: Exempt Individual Check ────────────────────────────────────────
-  if (step === "r4_exempt") {
-    const hasFM = input.visaTypes.some((v) => FM_VISAS.includes(v));
-    const hasJQ = input.visaTypes.some((v) => JQ_VISAS.includes(v));
-    const hasDiplomatic = input.visaTypes.some((v) => DIPLOMATIC_VISAS.includes(v));
-    const currentYear = new Date().getFullYear();
+      {/* ── Section 4: I-94 & Visa Arrival Dates ──────────────────────────── */}
+      {showVisaDates && (
+        <Section n={sectionNum()} title="Visa Arrival Dates & I-94 Information">
+          <Hint>Your I-94 Arrival/Departure Record shows your admission date and authorized stay. Find it at i94.cbp.dhs.gov. These dates determine your exempt individual status.</Hint>
 
-    return (
-      <Card>
-        <Q>Visa exemption questions</Q>
-        <Hint>
-          Certain visa holders are "exempt individuals" — their days in the US do not count toward the Substantial Presence Test.
-        </Hint>
-        <div className="space-y-6">
           {hasDiplomatic && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
-              <strong>Diplomatic / Government visa:</strong> Your days in the US are fully exempt from the Substantial Presence Test. No day-counting is required.
+              <strong>Diplomatic / Government visa:</strong> Your days in the US are fully exempt from the Substantial Presence Test. No day-counting required.
             </div>
           )}
+
           {hasFM && (
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-800">
-                What year did you first arrive in the US on an F or M student visa?
-              </label>
-              <input
-                type="number"
-                min={1990}
-                max={currentYear}
-                value={input.firstFMVisaArrivalYear ?? ""}
-                onChange={(e) =>
-                  setInput((p) => ({
-                    ...p,
-                    firstFMVisaArrivalYear: parseInt(e.target.value) || undefined,
-                  }))
-                }
-                className="w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. 2021"
-              />
-              {input.firstFMVisaArrivalYear && (
-                <p className="text-xs text-gray-500">
-                  Years on F/M visa: {2025 - input.firstFMVisaArrivalYear}.
-                  {2025 - input.firstFMVisaArrivalYear < 5
-                    ? " ✓ You are still within the 5-year exemption window."
-                    : " ✗ Your 5-year exemption has expired. Days will be counted."}
-                </p>
-              )}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-gray-800">
+                What was your <strong>first arrival date</strong> in the US on an F or M student visa? <span className="text-red-500">*</span>
+              </p>
+              <Hint>Check your original I-94 or passport entry stamp. Used to determine if you are within the 5-year exemption window.</Hint>
+              <input type="date" max="2025-12-31"
+                value={input.firstFMVisaArrivalDate ?? ""}
+                onChange={(e) => upd({ firstFMVisaArrivalDate: e.target.value })}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              {input.firstFMVisaArrivalDate && (() => {
+                const yr = new Date(input.firstFMVisaArrivalDate).getFullYear();
+                const yrs = 2025 - yr;
+                return (
+                  <p className={`text-xs font-medium ${yrs < 5 ? "text-green-600" : "text-amber-600"}`}>
+                    {yrs < 5
+                      ? `✓ Year ${yrs + 1} of 5 — you are within the F/M exemption window. Your days do not count toward SPT.`
+                      : `✗ ${yrs} years elapsed — your 5-year exemption has expired. Your days will be counted toward SPT.`}
+                  </p>
+                );
+              })()}
             </div>
           )}
+
           {hasJQ && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-800">
-                  What year did you first arrive in the US on a J or Q visa?
-                </label>
-                <input
-                  type="number"
-                  min={1990}
-                  max={currentYear}
-                  value={input.firstJQVisaArrivalYear ?? ""}
-                  onChange={(e) =>
-                    setInput((p) => ({
-                      ...p,
-                      firstJQVisaArrivalYear: parseInt(e.target.value) || undefined,
-                    }))
-                  }
-                  className="w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. 2023"
-                />
+                <p className="text-sm font-semibold text-gray-800">
+                  What was your <strong>first arrival date</strong> in the US on a J or Q visa? <span className="text-red-500">*</span>
+                </p>
+                <Hint>Used to determine years on J/Q visa. Check your original I-94 or passport entry stamp.</Hint>
+                <input type="date" max="2025-12-31"
+                  value={input.firstJQVisaArrivalDate ?? ""}
+                  onChange={(e) => upd({ firstJQVisaArrivalDate: e.target.value })}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-800">
-                  In how many prior calendar years have you claimed the J or Q visa exemption?
-                </label>
-                <select
-                  value={input.priorJQExemptYears ?? 0}
-                  onChange={(e) =>
-                    setInput((p) => ({ ...p, priorJQExemptYears: parseInt(e.target.value) }))
-                  }
-                  className="w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                >
-                  {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 6 ? "(max)" : ""}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500">
-                  J/Q visa holders may claim the exemption for up to 6 calendar years total.
+                <p className="text-sm font-semibold text-gray-800">
+                  How many prior calendar years have you claimed the J or Q visa exemption? <span className="text-red-500">*</span>
                 </p>
+                <select value={input.priorJQExemptYears ?? 0}
+                  onChange={(e) => upd({ priorJQExemptYears: parseInt(e.target.value) })}
+                  className="w-40 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  {[0,1,2,3,4,5,6].map((n) => <option key={n} value={n}>{n}{n === 6 ? " (max)" : ""}</option>)}
+                </select>
+                <Hint>J/Q visa holders may claim the exemption for up to 6 calendar years total. Include the current year if you qualify.</Hint>
               </div>
             </div>
           )}
-        </div>
-        <NextBtn
-          onClick={() => {
-            // Check if already NRA due to exemption
-            const precheck = compute();
-            if (precheck.classification === "NONRESIDENT_ALIEN" &&
-                (precheck.summary.includes("exempt") || precheck.summary.includes("Diplomatic"))) {
-              finalize();
-            } else {
-              setStep("r5_days");
-            }
-          }}
-        />
-      </Card>
-    );
-  }
 
-  // ── R-5: Days Present ───────────────────────────────────────────────────
-  if (step === "r5_days") {
-    type YearKey = "2025" | "2024" | "2023";
-    const years: { key: YearKey; gross: number; setExcl: React.Dispatch<React.SetStateAction<Record<string, number>>> }[] = [
-      { key: "2025", gross: input.grossDays2025, setExcl: setExcl2025 },
-      { key: "2024", gross: input.grossDays2024, setExcl: setExcl2024 },
-      { key: "2023", gross: input.grossDays2023, setExcl: setExcl2023 },
-    ];
-    const exclMap: Record<YearKey, Record<string, number>> = {
-      "2025": excl2025,
-      "2024": excl2024,
-      "2023": excl2023,
-    };
+          {/* I-94 details — for everyone with a visa */}
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            <p className="text-sm font-semibold text-gray-800">Current I-94 admission date <span className="text-xs font-normal text-gray-400">(Optional — for your records)</span></p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Most recent US entry date</label>
+                <input type="date" max="2025-12-31"
+                  value={input.i94AdmissionDate ?? ""}
+                  onChange={(e) => upd({ i94AdmissionDate: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Authorized stay until (or D/S)</label>
+                <input type="text" placeholder="e.g. 2026-05-15 or D/S"
+                  value={input.i94AdmittedUntilDate ?? ""}
+                  onChange={(e) => upd({ i94AdmittedUntilDate: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
 
-    return (
-      <Card>
-        <Q>How many days were you present in the United States?</Q>
-        <Hint>
-          Count any day you were physically in the US, even briefly. Do not count days you were only in transit between two foreign countries without clearing customs.
-        </Hint>
-        <div className="space-y-8">
-          {years.map(({ key, gross, setExcl }) => {
-            const excl = exclMap[key];
-            const exclTotal = sumExcl(excl);
+      {/* ── Section 5: Days Present ────────────────────────────────────────── */}
+      {showDays && (
+        <Section n={sectionNum()} title="Days Present in the United States">
+          <Hint>Count any day you were physically in the US, even briefly. Do not count days you were only in transit without clearing customs.</Hint>
+          {(["2025", "2024", "2023"] as const).map((yr) => {
+            const gross = yr === "2025" ? input.grossDays2025 : yr === "2024" ? input.grossDays2024 : input.grossDays2023;
+            const exclMap = yr === "2025" ? excl2025 : yr === "2024" ? excl2024 : excl2023;
+            const setExcl = yr === "2025" ? setExcl2025 : yr === "2024" ? setExcl2024 : setExcl2023;
+            const exclTotal = sumExcl(exclMap);
             return (
-              <div key={key} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
-                <div className="flex items-center gap-4">
+              <div key={yr} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
+                <div className="flex items-end gap-6">
                   <div>
                     <label className="block text-sm font-semibold text-gray-800 mb-1">
-                      Days present in the US in {key}
+                      Days present in the US in {yr} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={366}
+                    <input type="number" min={0} max={366} placeholder="0"
                       value={gross || ""}
                       onChange={(e) => {
                         const v = parseInt(e.target.value) || 0;
-                        setInput((p) => ({
-                          ...p,
-                          [`grossDays${key}`]: v,
-                        } as ResidencyInput));
+                        upd({ [`grossDays${yr}`]: v } as Partial<ResidencyInput>);
                       }}
-                      className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      placeholder="0"
-                    />
+                      className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   {exclTotal > 0 && (
-                    <div className="text-sm text-gray-500 mt-4">
-                      − {exclTotal} excluded = <strong>{Math.max(0, gross - exclTotal)} countable</strong>
-                    </div>
+                    <p className="text-sm text-gray-500 pb-2">− {exclTotal} excluded = <strong className="text-gray-800">{Math.max(0, gross - exclTotal)}</strong> countable</p>
                   )}
                 </div>
                 {gross > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      Did any of those days fall into these exempt categories?
-                    </p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Were any of those days excludable?</p>
                     <div className="space-y-3">
                       {EXCLUSION_REASONS.map((r) => (
                         <div key={r.id} className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5"
-                            checked={!!(excl[r.id] && excl[r.id] > 0)}
+                          <input type="checkbox" className="mt-0.5"
+                            checked={!!(exclMap[r.id] && exclMap[r.id] > 0)}
                             onChange={(e) => {
-                              if (!e.target.checked) {
-                                setExcl((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
-                              } else {
-                                setExcl((prev) => ({ ...prev, [r.id]: 1 }));
-                              }
-                            }}
-                          />
+                              if (!e.target.checked) setExcl((prev) => { const n = { ...prev }; delete n[r.id]; return n; });
+                              else setExcl((prev) => ({ ...prev, [r.id]: 1 }));
+                            }} />
                           <div className="flex-1">
                             <span className="text-sm text-gray-700">{r.label}</span>
-                            {excl[r.id] !== undefined && (
+                            {exclMap[r.id] !== undefined && (
                               <div className="mt-1 flex items-center gap-2">
-                                <span className="text-xs text-gray-500">How many such days in {key}?</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={gross}
-                                  value={excl[r.id] || ""}
-                                  onChange={(e) =>
-                                    setExcl((prev) => ({
-                                      ...prev,
-                                      [r.id]: parseInt(e.target.value) || 0,
-                                    }))
-                                  }
-                                  className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <span className="text-xs text-gray-500">How many days in {yr}?</span>
+                                <input type="number" min={1} max={gross}
+                                  value={exclMap[r.id] || ""}
+                                  onChange={(e) => setExcl((prev) => ({ ...prev, [r.id]: parseInt(e.target.value) || 0 }))}
+                                  className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                               </div>
                             )}
                           </div>
@@ -526,304 +363,144 @@ export function ResidencyWizard({ onComplete }: Props) {
               </div>
             );
           })}
-        </div>
-        <NextBtn
-          onClick={() => {
-            const net2025 = Math.max(0, input.grossDays2025 - sumExcl(excl2025));
-            const net2024 = Math.max(0, input.grossDays2024 - sumExcl(excl2024));
-            const net2023 = Math.max(0, input.grossDays2023 - sumExcl(excl2023));
-            const spt = net2025 + Math.floor(net2024 / 3) + Math.floor(net2023 / 6);
-            if (net2025 < 31 || spt < 183) {
-              setStep("r7_nra");
-            } else {
-              // SPT met — check arrival date
-              if (input.usArrivalDate2025 && input.usArrivalDate2025 > "2025-01-01") {
-                setStep("r9_dual_status");
-              } else {
-                // Ask arrival date
-                setStep("r9_dual_status");
-              }
-            }
-          }}
-        />
-      </Card>
-    );
-  }
+          {liveResult && (
+            <div className="text-sm text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+              SPT score: <strong className="text-blue-800">
+                {(input.grossDays2025 - sumExcl(excl2025))} +
+                {" "}{Math.floor(Math.max(0, input.grossDays2024 - sumExcl(excl2024)) / 3)} +
+                {" "}{Math.floor(Math.max(0, input.grossDays2023 - sumExcl(excl2023)) / 6)} =
+                {" "}{Math.max(0, input.grossDays2025 - sumExcl(excl2025)) +
+                      Math.floor(Math.max(0, input.grossDays2024 - sumExcl(excl2024)) / 3) +
+                      Math.floor(Math.max(0, input.grossDays2023 - sumExcl(excl2023)) / 6)}
+              </strong>
+              {" "}(183 required to be a resident)
+            </div>
+          )}
+        </Section>
+      )}
 
-  // ── R-7: NRA Path ───────────────────────────────────────────────────────
-  if (step === "r7_nra") {
-    return (
-      <Card>
-        <Q>A few more questions about your situation</Q>
-        <Hint>Based on the information so far, you appear to be a nonresident alien. We need a couple more details to complete your classification.</Hint>
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-800">
-              During 2025, did you maintain a tax home (your main place of business or employment) in a foreign country?
-            </p>
-            <div className="flex gap-3">
-              {["Yes", "No"].map((v) => (
-                <label
-                  key={v}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-colors ${
-                    (v === "Yes") === input.hasForeignTaxHome
-                      ? "border-blue-500 bg-blue-50 text-blue-800"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    className="sr-only"
-                    checked={(v === "Yes") === input.hasForeignTaxHome}
-                    onChange={() =>
-                      setInput((p) => ({ ...p, hasForeignTaxHome: v === "Yes" }))
-                    }
-                  />
-                  {v}
-                </label>
-              ))}
+      {/* ── Section 6: Dual-Status / Arrival Date ─────────────────────────── */}
+      {showDualStatus && (
+        <Section n={sectionNum()} title="US Residency Period">
+          <Hint>Your SPT score shows you met the 183-day threshold. If you arrived after January 1, part of 2025 you were a nonresident alien.</Hint>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-1">
+                What date did you first arrive in the US to begin your 2025 residency period? <span className="text-red-500">*</span>
+              </label>
+              <input type="date" min="2025-01-01" max="2025-12-31"
+                value={input.usArrivalDate2025 ?? ""}
+                onChange={(e) => upd({ usArrivalDate2025: e.target.value })}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-800">
-              Is your home country a US tax treaty country?
-            </p>
-            <div className="flex gap-3 mb-3">
-              {["Yes", "No", "Not sure"].map((v) => (
-                <label
-                  key={v}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer text-sm font-medium transition-colors ${
-                    input.homeTreatyCountry !== undefined
-                      ? (v === "Yes" && !!input.homeTreatyCountry) ||
-                        (v === "No" && input.homeTreatyCountry === "") ||
-                        (v === "Not sure" && input.homeTreatyCountry === "unknown")
-                        ? "border-blue-500 bg-blue-50 text-blue-800"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    className="sr-only"
-                    onChange={() => {
-                      if (v === "No") setInput((p) => ({ ...p, homeTreatyCountry: "", hasTreatyBenefits: false }));
-                      else if (v === "Not sure") setInput((p) => ({ ...p, homeTreatyCountry: "unknown", hasTreatyBenefits: false }));
-                      else setInput((p) => ({ ...p, homeTreatyCountry: p.homeTreatyCountry || undefined }));
-                    }}
-                  />
-                  {v}
-                </label>
-              ))}
-            </div>
-            {input.homeTreatyCountry !== "" && input.homeTreatyCountry !== "unknown" && (
-              <div className="space-y-2">
-                <label className="block text-xs font-medium text-gray-600">Which country?</label>
-                <input
-                  list="treaty-countries"
-                  value={input.homeTreatyCountry ?? ""}
-                  onChange={(e) =>
-                    setInput((p) => ({
-                      ...p,
-                      homeTreatyCountry: e.target.value,
-                      hasTreatyBenefits: TREATY_COUNTRIES.includes(e.target.value),
-                    }))
-                  }
-                  className="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Start typing country name..."
-                />
-                <datalist id="treaty-countries">
-                  {TREATY_COUNTRIES.map((c) => <option key={c} value={c} />)}
-                </datalist>
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Were you a US tax resident on December 31, 2025?</p>
+              <div className="flex gap-3">
+                <RadioPill label="Yes" checked={input.residencyEndDate2025 === undefined && input.usArrivalDate2025 !== undefined}
+                  onChange={() => upd({ residencyEndDate2025: undefined })} />
+                <RadioPill label="No — I left the US before Dec 31" checked={input.residencyEndDate2025 !== undefined && input.residencyEndDate2025 !== ""}
+                  onChange={() => upd({ residencyEndDate2025: "" })} />
               </div>
-            )}
-          </div>
-        </div>
-        <NextBtn onClick={() => finalize()} disabled={input.hasForeignTaxHome === undefined} />
-      </Card>
-    );
-  }
-
-  // ── R-9: Dual-Status / First-Year Choice ─────────────────────────────────
-  if (step === "r9_dual_status") {
-    const net2025 = Math.max(0, input.grossDays2025 - sumExcl(excl2025));
-    const net2024 = Math.max(0, input.grossDays2024 - sumExcl(excl2024));
-    const net2023 = Math.max(0, input.grossDays2023 - sumExcl(excl2023));
-    const spt = net2025 + Math.floor(net2024 / 3) + Math.floor(net2023 / 6);
-    const sptMet = spt >= 183 && net2025 >= 31;
-
-    return (
-      <Card>
-        <Q>When did your US tax residency begin?</Q>
-        {sptMet ? (
-          <Hint>
-            Your SPT score is {spt} — you meet the 183-day threshold. If you arrived in the US partway through 2025, part of the year you were a nonresident alien and part you were a resident alien (dual-status).
-          </Hint>
-        ) : (
-          <Hint>Let us confirm the dates of your US presence in 2025.</Hint>
-        )}
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-800">
-              What date did you first arrive in the US in 2025 to begin your period of residency?
-            </label>
-            <input
-              type="date"
-              value={input.usArrivalDate2025 ?? ""}
-              min="2025-01-01"
-              max="2025-12-31"
-              onChange={(e) => setInput((p) => ({ ...p, usArrivalDate2025: e.target.value }))}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-800">
-              Were you a US tax resident on December 31, 2025?
-            </p>
-            <div className="flex gap-3">
-              {["Yes", "No"].map((v) => (
-                <label
-                  key={v}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-colors ${
-                    (v === "Yes") === (input.residencyEndDate2025 === undefined)
-                      ? "border-blue-500 bg-blue-50 text-blue-800"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    className="sr-only"
-                    checked={(v === "Yes") === (input.residencyEndDate2025 === undefined)}
-                    onChange={() => {
-                      if (v === "Yes") setInput((p) => ({ ...p, residencyEndDate2025: undefined }));
-                      else setInput((p) => ({ ...p, residencyEndDate2025: p.residencyEndDate2025 ?? "" }));
-                    }}
-                  />
-                  {v}
-                </label>
-              ))}
             </div>
             {input.residencyEndDate2025 !== undefined && input.residencyEndDate2025 !== null && (
-              <div className="space-y-1">
-                <label className="block text-sm text-gray-600">What date did your US tax residency end?</label>
-                <input
-                  type="date"
-                  value={input.residencyEndDate2025}
-                  min="2025-01-01"
-                  max="2025-12-31"
-                  onChange={(e) => setInput((p) => ({ ...p, residencyEndDate2025: e.target.value }))}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-1">Date you ceased to be a US resident in 2025</label>
+                <input type="date" min="2025-01-01" max="2025-12-31"
+                  value={input.residencyEndDate2025 ?? ""}
+                  onChange={(e) => upd({ residencyEndDate2025: e.target.value })}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             )}
           </div>
-          {sptMet && input.usArrivalDate2025 && input.usArrivalDate2025 > "2025-01-01" && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
-              <p className="text-sm font-semibold text-blue-900">First-Year Choice Election (Optional)</p>
-              <p className="text-sm text-blue-700">
-                You may elect to be treated as a US resident for all of 2025 — even the period before you arrived. This simplifies your return into a single Form 1040. However, you must remain a full-year US resident in 2026 for this election to stand.
+        </Section>
+      )}
+
+      {/* ── Section 7: NRA Additional ──────────────────────────────────────── */}
+      {showNRA && (
+        <Section n={sectionNum()} title="Additional Questions — Nonresident Alien">
+          <Hint>A few more details help determine if any special exceptions or treaty benefits apply to your return.</Hint>
+          <div className="space-y-5">
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">
+                During 2025, did you maintain a tax home (main place of business or employment) in a foreign country? <span className="text-red-500">*</span>
               </p>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={!!input.wantsFirstYearChoice}
-                  onChange={(e) =>
-                    setInput((p) => ({
-                      ...p,
-                      wantsFirstYearChoice: e.target.checked,
-                      wasResidentPriorYear: false,
-                      maxConsecutiveDays2025: net2025,
-                      presencePercentageFrom31DayStart: 0.9,
-                    }))
-                  }
-                />
-                <span className="text-sm text-blue-800 font-medium">
-                  I want to elect First-Year Choice treatment (file Form 1040 for the full year)
-                </span>
-              </label>
+              <div className="flex gap-3">
+                <RadioPill label="Yes" checked={input.hasForeignTaxHome === true} onChange={() => upd({ hasForeignTaxHome: true })} />
+                <RadioPill label="No" checked={input.hasForeignTaxHome === false} onChange={() => upd({ hasForeignTaxHome: false })} />
+              </div>
+              {input.hasForeignTaxHome && (
+                <p className="text-xs text-green-600 mt-2">✓ You may qualify for the Closer Connection Exception (Form 8840), which can exclude you from SPT even if you met the day count.</p>
+              )}
             </div>
-          )}
-        </div>
-        <NextBtn onClick={() => finalize()} disabled={!input.usArrivalDate2025} />
-      </Card>
-    );
-  }
-
-  // ── Result Screen ─────────────────────────────────────────────────────────
-  if (step === "result" && result) {
-    const classColors: Record<string, string> = {
-      US_CITIZEN: "bg-green-100 text-green-800 border-green-300",
-      RESIDENT_ALIEN_GREEN_CARD: "bg-green-100 text-green-800 border-green-300",
-      RESIDENT_ALIEN_SPT: "bg-green-100 text-green-800 border-green-300",
-      RESIDENT_ALIEN_FYC: "bg-green-100 text-green-800 border-green-300",
-      NONRESIDENT_ALIEN: "bg-amber-100 text-amber-800 border-amber-300",
-      DUAL_STATUS: "bg-blue-100 text-blue-800 border-blue-300",
-    };
-
-    return (
-      <Card>
-        <div className="space-y-6">
-          <div>
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Your Filing Classification
-            </p>
-            <div
-              className={`inline-block px-4 py-2 rounded-xl border text-sm font-bold mb-4 ${classColors[result.classification]}`}
-            >
-              {result.summary.split("—")[0].trim()}
-            </div>
-            <p className="text-gray-700 text-sm leading-relaxed">{result.summaryDetail}</p>
-          </div>
-
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Your Filing Package
-            </p>
-            <p className="text-sm font-semibold text-gray-800">
-              {result.federalForm === "both"
-                ? "Form 1040 (resident period) + Form 1040-NR (nonresident period)"
-                : `Form ${result.federalForm}`}
-            </p>
-            {result.additionalForms.length > 0 && (
-              <p className="text-sm text-gray-600">
-                Additional: {result.additionalForms.join(", ")}
-              </p>
-            )}
-          </div>
-
-          {result.warnings.length > 0 && (
-            <div className="space-y-2">
-              {result.warnings.map((w, i) => (
-                <div key={i} className="flex gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                  <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
-                  {w}
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-2">Is your home country a US income tax treaty country?</p>
+              <div className="flex gap-3 mb-3">
+                <RadioPill label="Yes" checked={!!input.homeTreatyCountry && input.homeTreatyCountry !== "" && input.homeTreatyCountry !== "unknown"}
+                  onChange={() => upd({ homeTreatyCountry: undefined })} />
+                <RadioPill label="No" checked={input.homeTreatyCountry === ""}
+                  onChange={() => upd({ homeTreatyCountry: "", hasTreatyBenefits: false })} />
+                <RadioPill label="Not sure" checked={input.homeTreatyCountry === "unknown"}
+                  onChange={() => upd({ homeTreatyCountry: "unknown", hasTreatyBenefits: false })} />
+              </div>
+              {input.homeTreatyCountry !== "" && input.homeTreatyCountry !== "unknown" && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-600">Which country?</label>
+                  <input list="treaty-countries-list" placeholder="Start typing country name…"
+                    value={input.homeTreatyCountry ?? ""}
+                    onChange={(e) => upd({ homeTreatyCountry: e.target.value, hasTreatyBenefits: TREATY_COUNTRIES.includes(e.target.value) })}
+                    className="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <datalist id="treaty-countries-list">
+                    {TREATY_COUNTRIES.map((c) => <option key={c} value={c} />)}
+                  </datalist>
+                  {input.hasTreatyBenefits && (
+                    <p className="text-xs text-blue-600">✓ {input.homeTreatyCountry} has a US tax treaty. Potential treaty benefits will be noted in your return.</p>
+                  )}
                 </div>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* ── Live Result ────────────────────────────────────────────────────── */}
+      {liveResult && (
+        <div className={`rounded-2xl border-2 p-6 ${
+          liveResult.classification.startsWith("RESIDENT") || liveResult.classification === "US_CITIZEN"
+            ? "border-green-300 bg-green-50"
+            : liveResult.classification === "DUAL_STATUS"
+            ? "border-amber-300 bg-amber-50"
+            : "border-blue-300 bg-blue-50"
+        }`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Your Classification</p>
+              <p className="text-lg font-bold text-gray-900">{liveResult.summary}</p>
+              <p className="text-sm text-gray-600 mt-2">{liveResult.summaryDetail}</p>
+              {liveResult.additionalForms.length > 0 && (
+                <p className="text-sm text-gray-700 mt-2">
+                  Additional forms required: <strong>{liveResult.additionalForms.join(", ")}</strong>
+                </p>
+              )}
+              {liveResult.warnings.map((w, i) => (
+                <p key={i} className="text-sm text-amber-700 mt-2">⚠ {w}</p>
               ))}
             </div>
-          )}
-
-          <div className="flex items-center justify-between pt-2">
-            <button
-              onClick={() => {
-                setStep("r1_citizenship");
-                setInput(emptyInput);
-                setResult(null);
-              }}
-              className="text-sm text-gray-500 hover:text-gray-700 underline"
-            >
-              Change my answers
-            </button>
-            <button
-              onClick={() => onComplete(result, { ...input, excludedDays2025: sumExcl(excl2025), excludedDays2024: sumExcl(excl2024), excludedDays2023: sumExcl(excl2023) })}
-              className="bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-            >
-              This is correct — Continue →
-            </button>
           </div>
         </div>
-      </Card>
-    );
-  }
+      )}
 
-  return null;
+      {/* ── Confirm Button ─────────────────────────────────────────────────── */}
+      {liveResult && (
+        <div className="flex justify-end pt-2">
+          <button
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className="bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Confirm Classification & Continue →
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

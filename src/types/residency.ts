@@ -20,11 +20,15 @@ export interface ResidencyInput {
   visaTypes: string[];
 
   // R-4: Visa exemption data
-  firstFMVisaArrivalYear?: number; // F-1, F-2, M-1, M-2
-  firstJQVisaArrivalYear?: number; // J-1, J-2, Q-1
-  priorJQExemptYears?: number;     // prior calendar years of J/Q exemption claimed
+  firstFMVisaArrivalDate?: string;  // YYYY-MM-DD — first US arrival on F/M visa (from I-94)
+  firstJQVisaArrivalDate?: string;  // YYYY-MM-DD — first US arrival on J/Q visa (from I-94)
+  priorJQExemptYears?: number;      // prior calendar years of J/Q exemption claimed
 
-  // R-5: Days present
+  // I-94 details
+  i94AdmissionDate?: string;        // YYYY-MM-DD — most recent I-94 admission date
+  i94AdmittedUntilDate?: string;    // YYYY-MM-DD or "D/S" — I-94 authorized stay expiry
+
+  // R-5: Days present (manual entry — gross days each year)
   grossDays2025: number;
   grossDays2024: number;
   grossDays2023: number;
@@ -32,7 +36,7 @@ export interface ResidencyInput {
   excludedDays2024: number;
   excludedDays2023: number;
 
-  // R-6: Arrival date (dual-status check)
+  // R-6: Arrival date in current tax year (dual-status check)
   usArrivalDate2025?: string; // ISO date e.g. "2025-04-15"
 
   // R-7: NRA additional questions

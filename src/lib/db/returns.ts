@@ -99,6 +99,34 @@ export async function deleteTaxReturn(
   });
 }
 
+export async function listUserReturns(userId: string): Promise<TaxReturn[]> {
+  const db = getDb();
+  if (!db) return [];
+  const result = await db.execute({
+    sql: `SELECT * FROM tax_returns WHERE user_id = ? ORDER BY updated_at DESC`,
+    args: [userId],
+  });
+  return result.rows.map((r) => rowToTaxReturn(r as Record<string, unknown>));
+}
+
+export async function deleteUserReturn(id: string, userId: string): Promise<boolean> {
+  const db = getDb();
+  if (!db) return false;
+  // Only allow deleting draft returns; completed returns are permanent
+  const existing = await db.execute({
+    sql: `SELECT id, status FROM tax_returns WHERE id = ? AND user_id = ?`,
+    args: [id, userId],
+  });
+  if (existing.rows.length === 0) return false;
+  const row = existing.rows[0] as unknown as { status: string };
+  if (row.status === "complete") return false; // permanent
+  await db.execute({
+    sql: `DELETE FROM tax_returns WHERE id = ? AND user_id = ?`,
+    args: [id, userId],
+  });
+  return true;
+}
+
 function rowToTaxReturn(row: Record<string, unknown>): TaxReturn {
   return {
     id: row.id as string,

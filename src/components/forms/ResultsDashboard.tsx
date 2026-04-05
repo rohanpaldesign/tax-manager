@@ -7,6 +7,7 @@ interface Props {
   result: TaxCalculationResult;
   returnId: string;
   input: TaxReturnInput;
+  update: (patch: Partial<TaxReturnInput>) => void;
   onBack: () => void;
 }
 
@@ -28,10 +29,19 @@ function ResultRow({ label, value, bold, indent, positive, negative }: {
   );
 }
 
-export function ResultsDashboard({ result, returnId, input, onBack }: Props) {
+export function ResultsDashboard({ result, returnId, input, update, onBack }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [activeTab, setActiveTab] = useState<"summary" | "federal" | "state" | "forms" | "instructions">("summary");
+  const [ssnInput, setSsnInput] = useState(input.ssn ?? "");
+  const [ssnSaved, setSsnSaved] = useState(!!(input.ssn && input.ssn.replace(/\D/g, "").length === 9));
   const f = result.federal;
+
+  const hasSsn = ssnSaved && input.ssn && input.ssn.replace(/\D/g, "").length === 9;
+
+  function saveSsn() {
+    update({ ssn: ssnInput });
+    setSsnSaved(true);
+  }
 
   const downloadPDF = async () => {
     setDownloading(true);
@@ -66,13 +76,33 @@ export function ResultsDashboard({ result, returnId, input, onBack }: Props) {
             <button onClick={onBack} className="text-blue-600 text-sm hover:underline">← Edit Return</button>
             <h1 className="text-lg font-bold text-gray-900 mt-0.5">2025 Tax Return Results</h1>
           </div>
-          <button
-            onClick={downloadPDF}
-            disabled={downloading}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {downloading ? "Generating PDF..." : "Download PDF"}
-          </button>
+          {hasSsn ? (
+            <button
+              onClick={downloadPDF}
+              disabled={downloading}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {downloading ? "Generating PDF..." : "Download PDF"}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={ssnInput}
+                onChange={(e) => { setSsnInput(e.target.value); setSsnSaved(false); }}
+                placeholder="SSN (XXX-XX-XXXX)"
+                maxLength={11}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={saveSsn}
+                disabled={ssnInput.replace(/\D/g, "").length !== 9}
+                className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                Save & Download
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -147,6 +177,34 @@ export function ResultsDashboard({ result, returnId, input, onBack }: Props) {
             </div>
           </div>
         </div>
+
+        {/* SSN prompt — shown before user enters SSN */}
+        {!hasSsn && (
+          <div className="mb-6 p-5 bg-blue-50 border border-blue-200 rounded-2xl">
+            <p className="text-sm font-semibold text-blue-900 mb-1">Ready to generate your filing package?</p>
+            <p className="text-sm text-blue-700 mb-3">
+              Your estimated refund / amount due is shown above. To generate the printable forms, enter your Social Security Number (SSN) or Individual Taxpayer Identification Number (ITIN).
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={ssnInput}
+                onChange={(e) => { setSsnInput(e.target.value); setSsnSaved(false); }}
+                placeholder="XXX-XX-XXXX"
+                maxLength={11}
+                className="border border-blue-300 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono w-44 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              />
+              <button
+                onClick={saveSsn}
+                disabled={ssnInput.replace(/\D/g, "").length !== 9}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                Save SSN
+              </button>
+              <span className="text-xs text-blue-600">Your SSN is used only to fill in the form — never stored separately.</span>
+            </div>
+          </div>
+        )}
 
         {/* Warnings */}
         {result.warnings.length > 0 && (

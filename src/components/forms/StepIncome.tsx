@@ -6,8 +6,9 @@ import type { TaxReturnInput, W2Income, Form1099NEC, Form1099DIV, Form1099INT, F
 interface Props {
   input: TaxReturnInput;
   update: (patch: Partial<TaxReturnInput>) => void;
-  onNext: () => void;
-  onBack: () => void;
+  onNext?: () => void;
+  onBack?: () => void;
+  hideFooter?: boolean;
 }
 
 type IncomeSection = "w2" | "1099nec" | "1099div" | "1099int" | "1099b" | "1099r" | "1099g" | "1042s" | "scheduleC" | "rental" | "ss" | "foreign";
@@ -39,7 +40,7 @@ function NumberInput({
   );
 }
 
-export function StepIncome({ input, update, onNext, onBack }: Props) {
+export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props) {
   const [openSection, setOpenSection] = useState<IncomeSection | null>("w2");
   const [editingW2, setEditingW2] = useState<W2Income | null>(null);
 
@@ -811,14 +812,16 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
         </div>
       </div>
 
-      <div className="flex justify-between pt-4">
-        <button onClick={onBack} className="border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-          ← Back
-        </button>
-        <button onClick={onNext} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
-          Continue to Deductions →
-        </button>
-      </div>
+      {!hideFooter && (
+        <div className="flex justify-between pt-4">
+          <button onClick={onBack} className="border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-colors">
+            ← Back
+          </button>
+          <button onClick={onNext} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
+            Continue to Deductions →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

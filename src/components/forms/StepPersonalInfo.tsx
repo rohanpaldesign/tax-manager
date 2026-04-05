@@ -5,7 +5,8 @@ import type { TaxReturnInput, FilingStatus, ResidencyStatus, StateCode } from "@
 interface Props {
   input: TaxReturnInput;
   update: (patch: Partial<TaxReturnInput>) => void;
-  onNext: () => void;
+  onNext?: () => void;
+  hideFooter?: boolean;
   hideResidency?: boolean;
   computedResidencyLabel?: string;
   computedResidencyForm?: string;
@@ -32,13 +33,12 @@ const STATES: { value: StateCode; label: string }[] = [
   { value: "WA", label: "Washington" },
 ];
 
-export function StepPersonalInfo({ input, update, onNext, hideResidency, computedResidencyLabel, computedResidencyForm, onChangeResidency }: Props) {
+export function StepPersonalInfo({ input, update, onNext, hideFooter, hideResidency, computedResidencyLabel, computedResidencyForm, onChangeResidency }: Props) {
   const isMFJ = input.filingStatus === "married_filing_jointly" || input.filingStatus === "married_filing_separately";
 
   const isValid =
     input.firstName.trim() &&
     input.lastName.trim() &&
-    input.ssn.replace(/\D/g, "").length === 9 &&
     input.dateOfBirth &&
     input.address.trim() &&
     input.city.trim() &&
@@ -91,56 +91,52 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
         <h3 className="font-semibold text-gray-800 mb-3">Your Information</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={input.firstName}
               onChange={(e) => update({ firstName: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="John"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={input.lastName}
               onChange={(e) => update({ lastName: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Smith"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Social Security Number</label>
-            <input
-              type="text"
-              value={input.ssn}
-              onChange={(e) => update({ ssn: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-              placeholder="XXX-XX-XXXX"
-              maxLength={11}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Date of Birth <span className="text-red-500">*</span>
+            </label>
             <input
               type="date"
               value={input.dateOfBirth}
               onChange={(e) => update({ dateOfBirth: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Occupation</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Occupation <span className="text-xs font-normal text-gray-400">(optional)</span>
+            </label>
             <input
               type="text"
               value={input.occupation}
               onChange={(e) => update({ occupation: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Software Engineer"
             />
           </div>
         </div>
+        <p className="text-xs text-gray-400 mt-3">
+          Social Security Number is collected in the final step, after you see your estimated tax amount.
+        </p>
       </section>
 
       {/* Spouse Info */}
@@ -154,7 +150,7 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
                 type="text"
                 value={input.spouseFirstName ?? ""}
                 onChange={(e) => update({ spouseFirstName: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
@@ -163,7 +159,7 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
                 type="text"
                 value={input.spouseLastName ?? ""}
                 onChange={(e) => update({ spouseLastName: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
@@ -182,7 +178,7 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
                 type="date"
                 value={input.spouseDateOfBirth ?? ""}
                 onChange={(e) => update({ spouseDateOfBirth: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -198,7 +194,7 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
             value={input.address}
             onChange={(e) => update({ address: e.target.value })}
             placeholder="Street address"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-1">
@@ -207,7 +203,7 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
                 value={input.city}
                 onChange={(e) => update({ city: e.target.value })}
                 placeholder="City"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
@@ -232,7 +228,7 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
                 value={input.zip}
                 onChange={(e) => update({ zip: e.target.value })}
                 placeholder="ZIP"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 maxLength={10}
               />
             </div>
@@ -302,15 +298,17 @@ export function StepPersonalInfo({ input, update, onNext, hideResidency, compute
         </section>
       )}
 
-      <div className="flex justify-end pt-4">
-        <button
-          onClick={onNext}
-          disabled={!isValid}
-          className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Continue to Income →
-        </button>
-      </div>
+      {!hideFooter && (
+        <div className="flex justify-end pt-4">
+          <button
+            onClick={onNext}
+            disabled={!isValid}
+            className="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Continue to Income →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
