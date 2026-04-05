@@ -284,40 +284,83 @@ function buildFederalSection(
   pb.text("INCOME", pb.margin, 9, true);
   pb.y -= 14;
   const incomeRows: [string, number][] = [
-    ["1.  Wages, salaries, tips (W-2 Box 1)", f.totalWages],
+    ["1a. Wages, salaries, tips (W-2 Box 1)", f.totalWages],
     ["2b. Taxable interest (Schedule B)", f.totalInterest],
     ["3b. Ordinary dividends (Schedule B)", f.totalDividends],
-    ["3c. Qualified dividends (included above)", f.qualifiedDividends],
-    ["7.  Capital gain or loss (Schedule D)", f.totalCapitalGains],
-    ["4b. IRA distributions (taxable)", f.iRADistributions],
-    ["5b. Pensions and annuities (taxable)", f.pensionAnnuities],
-    ["6b. Social Security benefits (taxable)", f.socialSecurityTaxable],
-    ["8.  Business income (Schedule C)", f.scheduleCNetProfit],
-    ["8a. Rental real estate (Schedule E)", f.scheduleENetIncome],
-    ["8z. Other income", f.otherIncome],
+    ["3c.   Qualified dividends (included in 3b)", f.qualifiedDividends],
+    ["4b. IRA distributions — taxable amount", f.iRADistributions],
+    ["5b. Pensions and annuities — taxable amount", f.pensionAnnuities],
+    ["6b. Social Security benefits — taxable amount", f.socialSecurityTaxable],
+    ["7.  Capital gain or (loss) (Schedule D / Form 8949)", f.totalCapitalGains],
+    ["8.  Additional income (Schedule 1):", 0],
+    ["    Sch. C  Business income or (loss)", f.scheduleCNetProfit],
+    ["    Sch. E  Rental real estate, royalties", f.scheduleENetIncome],
+    ["    Other income (NEC, unemployment, foreign)", f.otherIncome],
   ];
   for (const [label, value] of incomeRows) {
     if (value !== 0) pb.row(label, fmtMoney(value), false, 10);
+    else if (label.startsWith("8.")) pb.row(label, "", false, 10);
   }
   pb.row("9.  Total income", fmtMoney(f.totalIncome), true, 10);
 
+  // ── Schedule 1 — Adjustments to Income ─────────────────────────────────────
   pb.skip();
-  pb.text("ADJUSTMENTS TO INCOME", pb.margin, 9, true);
+  pb.checkY(80);
+  pb.text("SCHEDULE 1 — ADJUSTMENTS TO INCOME (above-the-line)", pb.margin, 9, true);
   pb.y -= 14;
-  pb.row("10. Adjustments (SE tax, IRA, HSA, student loan, etc.)", fmtMoney(-f.totalAdjustments), false, 10);
-  pb.row("11. Adjusted Gross Income (AGI)", fmtMoney(f.adjustedGrossIncome), true, 10);
+  if (f.selfEmploymentTax > 0) {
+    pb.row("15. Deductible part of self-employment tax (50%)", fmtMoney(-(f.selfEmploymentTax * 0.5)), false, 10);
+  }
+  if ((input.selfEmployedHealthInsurance ?? 0) > 0) {
+    pb.row("17. Self-employed health insurance deduction", fmtMoney(-Math.min(input.selfEmployedHealthInsurance!, f.scheduleCNetProfit)), false, 10);
+  }
+  const sepTotal = (input.retirementContributions.sep_ira) + (input.retirementContributions.simple_ira) + (input.retirementContributions.solo401k_traditional);
+  if (sepTotal > 0) {
+    pb.row("16. SEP, SIMPLE, and qualified plans deduction", fmtMoney(-sepTotal), false, 10);
+  }
+  if ((input.studentLoanInterest?.interestPaid ?? 0) > 0) {
+    pb.row("21. Student loan interest deduction (max $2,500)", fmtMoney(-Math.min(input.studentLoanInterest!.interestPaid, 2_500)), false, 10);
+  }
+  if (input.retirementContributions.hsa > 0) {
+    pb.row("13. HSA deduction (Form 8889)", fmtMoney(-Math.min(input.retirementContributions.hsa, 8_550)), false, 10);
+  }
+  if ((input.educatorExpenses ?? 0) > 0) {
+    pb.row("11. Educator expenses (max $300)", fmtMoney(-Math.min(input.educatorExpenses!, 300)), false, 10);
+  }
+  if ((input.alimonyPaid ?? 0) > 0) {
+    pb.row("19a. Alimony paid (pre-2019 divorce only)", fmtMoney(-(input.alimonyPaid!)), false, 10);
+  }
+  if ((input.earlyWithdrawalPenalties ?? 0) > 0) {
+    pb.row("18. Penalty on early withdrawal of savings", fmtMoney(-(input.earlyWithdrawalPenalties!)), false, 10);
+  }
+  if (f.totalAdjustments > 0) {
+    pb.row("26. Total adjustments → Form 1040 Line 10", fmtMoney(-f.totalAdjustments), true, 10);
+  }
+  pb.row("11. Adjusted Gross Income (AGI) — Form 1040 Line 11", fmtMoney(f.adjustedGrossIncome), true, 10);
 
+  // ── Deductions (Standard or Schedule A) ────────────────────────────────────
   pb.skip();
-  pb.text("DEDUCTIONS", pb.margin, 9, true);
+  pb.checkY(80);
+  pb.text(f.isItemized ? "SCHEDULE A — ITEMIZED DEDUCTIONS" : "STANDARD DEDUCTION", pb.margin, 9, true);
   pb.y -= 14;
-  pb.row(
-    `12. ${f.isItemized ? "Itemized deductions (Schedule A)" : "Standard deduction"}`,
-    fmtMoney(-f.standardOrItemizedDeduction),
-    false,
-    10
-  );
+  if (f.isItemized) {
+    const saltCap = input.filingStatus === "married_filing_separately" ? 5_000 : 10_000;
+    const saltUsed = Math.min((input.stateLocalTaxes ?? 0) + (input.homeOwnership?.propertyTaxes ?? 0), saltCap);
+    if (saltUsed > 0) pb.row("5e. State & local taxes (SALT, capped at $10,000)", fmtMoney(-saltUsed), false, 10);
+    if ((input.homeOwnership?.mortgageInterest ?? 0) > 0)
+      pb.row("8a. Home mortgage interest (Form 1098)", fmtMoney(-((input.homeOwnership?.mortgageInterest ?? 0) + (input.homeOwnership?.pointsPaid ?? 0))), false, 10);
+    const charTotal = (input.charitableContributions?.cashContributions ?? 0) + (input.charitableContributions?.nonCashContributions ?? 0) + (input.charitableContributions?.carryoverFromPrior ?? 0);
+    if (charTotal > 0) pb.row("11. Gifts to charity", fmtMoney(-charTotal), false, 10);
+    const agi = f.adjustedGrossIncome;
+    const medDeduct = Math.max(0, (input.medicalExpenses?.totalMedicalExpenses ?? 0) - agi * 0.075);
+    if (medDeduct > 0) pb.row("4.  Medical & dental expenses (above 7.5% AGI)", fmtMoney(-medDeduct), false, 10);
+    if ((input.casualtyLosses ?? 0) > 0) pb.row("15. Casualty and theft losses (disaster only)", fmtMoney(-(input.casualtyLosses!)), false, 10);
+    pb.row("17. Total itemized deductions → Form 1040 Line 12", fmtMoney(-f.standardOrItemizedDeduction), true, 10);
+  } else {
+    pb.row("12. Standard deduction", fmtMoney(-f.standardOrItemizedDeduction), false, 10);
+  }
   if (f.qualifiedBusinessIncomeDeduction > 0) {
-    pb.row("13. Qualified business income deduction (Form 8995, Sec. 199A)", fmtMoney(-f.qualifiedBusinessIncomeDeduction), false, 10);
+    pb.row("13. QBI deduction — Sec. 199A (Form 8995)", fmtMoney(-f.qualifiedBusinessIncomeDeduction), false, 10);
   }
   pb.row("15. Taxable income", fmtMoney(f.taxableIncome), true, 10);
 
@@ -529,7 +572,7 @@ function buildInstructionsSection(
   pb.y -= 14;
   if (f.amountDue > 0) {
     pb.bullet(`Federal amount due: ${fmtMoney(f.amountDue)}. Due by April 15, 2026.`);
-    pb.bullet('Make check or money order payable to "United States Treasury." Write your SSN and "2025 Form 1040" on the memo line.');
+    pb.bullet(`Make check or money order payable to "United States Treasury." Write your SSN and "2025 Form ${isNR ? "1040-NR" : "1040"}" on the memo line.`);
     pb.bullet("Pay online at irs.gov/payments (IRS Direct Pay — free, no account needed). Or enroll in EFTPS for future payments.");
     pb.bullet("If you cannot pay in full, consider an installment agreement at irs.gov/payments/online-payment-agreement.");
   } else if (f.refund > 0) {
@@ -601,6 +644,7 @@ function buildPaymentVouchers(
 ) {
   const f = result.federal;
   const st = result.state;
+  const isNR = input.residencyStatus === "nonresident";
 
   pb.sectionBand(4, "PAYMENT VOUCHERS", rgb(0.72, 0.25, 0.05));
 
@@ -636,7 +680,7 @@ function buildPaymentVouchers(
     pb.text("HOW TO PAY:", pb.margin, 9, true);
     pb.y -= 14;
     pb.bullet(`Make check or money order payable to "United States Treasury."`);
-    pb.bullet(`Write your SSN and "2025 Form 1040" on the memo line of your check.`);
+    pb.bullet(`Write your SSN and "2025 Form ${isNR ? "1040-NR" : "1040"}" on the memo line of your check.`);
     pb.bullet("Detach this voucher and mail it WITH your check to the federal mailing address shown in Part 1.");
     pb.bullet("Do NOT staple your check to the return.");
     pb.skip();
