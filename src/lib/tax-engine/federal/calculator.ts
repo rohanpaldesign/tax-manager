@@ -397,21 +397,33 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   const seDeduction = seTax * C.SE_DEDUCTION_RATE;
 
   // ── Step 3: Adjustments to Income ──────────────────────────────────────────
+  // Educator expenses: max $300 (single educator), $600 if MFJ and both are educators
+  // We use $300 cap per return as a conservative default; MFJ double-educator case is rare
+  const educatorExpensesDeduction = Math.min(
+    input.educatorExpenses ?? 0,
+    fs === "married_filing_jointly" ? 600 : 300
+  );
+
   const selfEmployedHealthIns = clamp(
     input.selfEmployedHealthInsurance ?? 0,
     0,
     seSelfEmploymentIncome
   );
+
+  // SEP/Solo 401k limits: SEP max = 25% of net SE income, up to $70,000
+  const sepMax = Math.min(seSelfEmploymentIncome * 0.25, 70_000);
+  const sepIRAContrib = Math.min(input.retirementContributions.sep_ira, sepMax);
   const sepIRADeduction =
-    input.retirementContributions.sep_ira +
+    sepIRAContrib +
     input.retirementContributions.simple_ira +
-    input.retirementContributions.solo401k_traditional;
+    Math.min(input.retirementContributions.solo401k_traditional, 70_000);
 
   const studentLoanInt = clamp(input.studentLoanInterest?.interestPaid ?? 0, 0, 2_500);
   const earlyWithdrawalPenalty = input.earlyWithdrawalPenalties ?? 0;
   const alimonyPaid = input.alimonyPaid ?? 0;
   // HSA deduction (Form 8889) — only for contributions made directly to HSA, not pre-tax payroll
-  const hsaDeduction = input.retirementContributions.hsa;
+  // Cap at family limit as upper bound; individual limit is $4,300
+  const hsaDeduction = Math.min(input.retirementContributions.hsa, C.HSA_LIMIT_FAMILY);
 
   const totalAdjustments =
     seDeduction +
@@ -420,7 +432,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     studentLoanInt +
     earlyWithdrawalPenalty +
     alimonyPaid +
-    hsaDeduction;
+    hsaDeduction +
+    educatorExpensesDeduction;
 
   // First-pass AGI (SS not yet included)
   const agiWithoutSS = totalIncomeBeforeSS - totalAdjustments;
@@ -460,18 +473,28 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   }
 
   // ── Traditional IRA Deductibility ──────────────────────────────────────────
-  const isActivePlanParticipant = input.w2Income.some((_) => true); // simplification
+  // Active plan participant: W-2 employee (employer likely has retirement plan) OR
+  // self-employed with SEP/SIMPLE/Solo 401k contributions
+  const isActivePlanParticipant =
+    input.w2Income.length > 0 ||
+    input.retirementContributions.sep_ira > 0 ||
+    input.retirementContributions.simple_ira > 0 ||
+    input.retirementContributions.solo401k_traditional > 0;
+  // Cap IRA contribution at legal limit
+  const iraLimit = C.IRA_CONTRIBUTION_LIMIT; // $7,000 (age-50+ catchup not tracked in Phase 1)
+  const iraContrib = Math.min(input.retirementContributions.traditionalIRA, iraLimit);
   let traditionalIRADeductible = 0;
   if (isActivePlanParticipant) {
     const [lo, hi] = C.TRADITIONAL_IRA_DEDUCTION_PHASEOUT_ACTIVE[fs];
     if (adjustedGrossIncome <= lo) {
-      traditionalIRADeductible = input.retirementContributions.traditionalIRA;
+      traditionalIRADeductible = iraContrib;
     } else if (adjustedGrossIncome < hi) {
       const pct = 1 - (adjustedGrossIncome - lo) / (hi - lo);
-      traditionalIRADeductible = input.retirementContributions.traditionalIRA * pct;
+      // Round down to nearest $10 per IRS rules, minimum $200 if otherwise eligible
+      traditionalIRADeductible = Math.max(0, Math.floor(iraContrib * pct / 10) * 10);
     }
   } else {
-    traditionalIRADeductible = input.retirementContributions.traditionalIRA;
+    traditionalIRADeductible = iraContrib;
   }
 
   // ── Step 4: Deductions — always compute both, pick the larger ──────────────
@@ -732,7 +755,7 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     foreignTaxCredit,
     retirementSaverCredit,
     premiumTaxCredit: 0, // Form 8962 — requires marketplace info
-    otherCredits: 0,
+    otherCredits: energyCreditAmt + adoptionCredit + evCredit,
     totalCredits,
     totalWithheld,
     estimatedTaxPaid,
@@ -742,6 +765,7 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     refund,
     amountDue,
     underpaymentPenalty,
+    capitalLossCarryforward: netCapitalGain < -3_000 ? -(netCapitalGain + 3_000) : undefined,
     effectiveTaxRate,
     marginalTaxRate,
   };

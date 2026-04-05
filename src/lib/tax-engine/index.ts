@@ -30,6 +30,11 @@ export function calculateTaxes(input: TaxReturnInput): TaxCalculationResult {
       `Net Investment Income Tax (3.8%) applies: $${Math.round(federal.netInvestmentIncomeTax).toLocaleString()}.`
     );
   }
+  if (federal.capitalLossCarryforward && federal.capitalLossCarryforward > 0) {
+    warnings.push(
+      `You have a capital loss carryforward of $${Math.round(federal.capitalLossCarryforward).toLocaleString()} that carries forward to your 2026 return. Keep this amount on your records.`
+    );
+  }
 
   // ── State ─────────────────────────────────────────────────────────────────
   let stateResult = undefined;

@@ -273,6 +273,7 @@ export const TaxReturnInputSchema = z.object({
   }).optional(),
 
   // Adjustments
+  educatorExpenses: money.optional(),
   studentLoanInterest: z.object({ interestPaid: money }).optional(),
   tuitionEducation: z.array(z.object({
     institutionName: z.string().default(""),

@@ -86,10 +86,14 @@ const CA_PERSONAL_EXEMPTION_CREDIT: Record<FilingStatus, number> = {
 };
 const CA_DEPENDENT_EXEMPTION_CREDIT = 433;
 
-// CalEITC thresholds (2025 estimated)
-// Phase-in/phase-out schedule by qualifying children count
-const CALEITC_MAX_CREDIT: Record<number, number> = { 0: 285, 1: 1_905, 2: 3_137, 3: 3_529 };
-const CALEITC_MAX_EARNED: Record<number, number> = { 0: 22_302, 1: 49_502, 2: 49_502, 3: 49_502 };
+// CalEITC thresholds (2025 estimated — based on 2024 published values + ~3% inflation)
+// Structure: phase-in from $0 to phaseInEnd, plateau to plateauEnd, phase-out to maxEarned
+const CALEITC_PARAMS: Record<number, { maxCredit: number; phaseInEnd: number; plateauEnd: number; maxEarned: number }> = {
+  0: { maxCredit: 285,   phaseInEnd: 6_700,  plateauEnd: 11_800, maxEarned: 22_302 },
+  1: { maxCredit: 1_905, phaseInEnd: 10_200, plateauEnd: 19_200, maxEarned: 49_502 },
+  2: { maxCredit: 3_137, phaseInEnd: 14_400, plateauEnd: 19_200, maxEarned: 49_502 },
+  3: { maxCredit: 3_529, phaseInEnd: 14_400, plateauEnd: 19_200, maxEarned: 49_502 },
+};
 
 // Mental Health Services Tax: 1% on income over $1M (already in brackets above)
 
@@ -160,7 +164,12 @@ export function calculateCATax(
   const caTaxBeforeCredits = applyBrackets(caTaxableIncome, CA_BRACKETS[fs]);
 
   // ── Credits ──────────────────────────────────────────────────────────────────
-  let caCredits = CA_PERSONAL_EXEMPTION_CREDIT[fs];
+  // CA personal exemption credit phaseout: $1 per $1 of AGI above $100k (single) / $200k (MFJ)
+  const exemptionPhaseoutStart = (fs === "married_filing_jointly" || fs === "qualifying_surviving_spouse") ? 200_000 : 100_000;
+  const basePersonalExemption = CA_PERSONAL_EXEMPTION_CREDIT[fs];
+  const exemptionReduction = Math.max(0, caAGI - exemptionPhaseoutStart);
+  const personalExemptionCredit = Math.max(0, basePersonalExemption - exemptionReduction);
+  let caCredits = personalExemptionCredit;
   caCredits += input.dependents.length * CA_DEPENDENT_EXEMPTION_CREDIT;
 
   // CA Renter's Credit (non-refundable) — income limit: $50k single, $100k MFJ
@@ -190,26 +199,34 @@ export function calculateCATax(
   const nonRefundableCaTax = Math.max(0, caTaxBeforeCredits - caCredits);
 
   // ── CalEITC (California Earned Income Tax Credit — REFUNDABLE) ───────────────
-  // Available to CA residents with earned income below threshold; NRA ineligible
+  // Available to CA residents/part-year residents with earned income; NRA ineligible
   let calEITC = 0;
   if (input.residencyStatus !== "nonresident" && federalEarnedIncome > 0) {
     const numChildren = Math.min(input.dependents.filter((d) => d.eitcEligible).length, 3);
-    const maxEarned = CALEITC_MAX_EARNED[numChildren] ?? 0;
-    if (federalEarnedIncome <= maxEarned) {
-      // Simplified linear interpolation: full credit at mid-range
-      const maxCredit = CALEITC_MAX_CREDIT[numChildren] ?? 0;
-      // Phase-out: credit reduces to 0 at maxEarned
-      const ratio = 1 - (federalEarnedIncome / maxEarned);
-      calEITC = Math.round(maxCredit * Math.max(0, Math.min(1, ratio * 2.5)));
+    const params = CALEITC_PARAMS[numChildren];
+    if (params && federalEarnedIncome <= params.maxEarned) {
+      if (federalEarnedIncome <= params.phaseInEnd) {
+        // Phase-in: credit increases linearly from $0 to maxCredit
+        calEITC = Math.round(params.maxCredit * (federalEarnedIncome / params.phaseInEnd));
+      } else if (federalEarnedIncome <= params.plateauEnd) {
+        // Plateau: full credit
+        calEITC = params.maxCredit;
+      } else {
+        // Phase-out: credit decreases linearly from maxCredit to $0
+        const phaseOutRange = params.maxEarned - params.plateauEnd;
+        const overPlateau = federalEarnedIncome - params.plateauEnd;
+        calEITC = Math.round(params.maxCredit * Math.max(0, 1 - overPlateau / phaseOutRange));
+      }
     }
   }
 
   const caTax = Math.max(0, nonRefundableCaTax) - calEITC;
 
-  // CA withholding
-  const caWithheld = input.w2Income
-    .filter((w) => w.state === "CA")
-    .reduce((s, w) => s + w.stateWithheld, 0);
+  // CA withholding: W-2 Box 17 + 1099-R state withholding + 1099-G state withholding
+  const caWithheld =
+    input.w2Income.filter((w) => w.state === "CA").reduce((s, w) => s + w.stateWithheld, 0) +
+    input.form1099R.reduce((s, r) => s + (r.stateWithheld ?? 0), 0) +
+    (input.form1099G ?? []).reduce((s, f) => s + (f.stateWithheld ?? 0), 0);
 
   const balance = caTax - caWithheld;
 

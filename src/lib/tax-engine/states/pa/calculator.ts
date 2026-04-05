@@ -51,6 +51,13 @@ export function calculatePATax(
   // ── PA Compensation ─────────────────────────────────────────────────────────
   const paWages = input.w2Income.reduce((s, w) => s + w.wages, 0);
 
+  // 1042-S wages and personal services income are PA-taxable compensation
+  // Income codes 17 (independent personal services), 18 (dependent personal services/wages),
+  // 19 (wages), 20 (other income subject to tax) — exclude code 15/16 (scholarships)
+  const pa1042SWages = (input.form1042S ?? [])
+    .filter((f) => ["17", "18", "19", "20"].includes(f.incomeCode))
+    .reduce((s, f) => s + Math.max(0, f.grossIncome - (f.exemptedIncome ?? 0)), 0);
+
   // ── PA Interest ─────────────────────────────────────────────────────────────
   const paInterest = input.form1099INT.reduce((s, f) => s + f.interestIncome, 0);
 
@@ -120,12 +127,15 @@ export function calculatePATax(
   }, 0);
 
   // ── PA Retirement Distributions ──────────────────────────────────────────────
-  // PA generally does NOT tax distributions from:
-  // - 401(k), 403(b), IRA, pension plans (if after retirement age / normal distribution)
-  // Exception: Early distributions (code 1) are taxable in PA
+  // PA does NOT tax normal distributions from employer plans (401k, 403b, pension)
+  // PA DOES tax:
+  //   - Early distributions (code 1, 2) from any plan
+  //   - Normal distributions (code 7) from IRAs (iraOrSepSimple = true)
+  // PA does NOT tax normal distributions from employer-sponsored plans after retirement age
   const paRetirementTaxable = input.form1099R.filter((r) => {
-    // Distribution codes 1 and 2 (early) are taxable in PA
-    return r.distributionCode === "1" || r.distributionCode === "2";
+    if (r.distributionCode === "1" || r.distributionCode === "2") return true; // early = taxable
+    if (r.distributionCode === "7" && r.iraOrSepSimple) return true; // IRA normal dist = taxable in PA
+    return false;
   }).reduce((s, r) => s + r.taxableAmount, 0);
 
   // ── PA 1099-MISC ─────────────────────────────────────────────────────────────
@@ -134,9 +144,17 @@ export function calculatePATax(
     0
   );
 
+  // ── PA Unemployment Compensation ─────────────────────────────────────────────
+  // PA taxes unemployment compensation (unlike SS which is exempt)
+  const paUnemployment = (input.form1099G ?? []).reduce(
+    (s, f) => s + f.unemploymentCompensation,
+    0
+  );
+
   // ── PA Taxable Income ─────────────────────────────────────────────────────────
   const paTaxableIncome =
     paWages +
+    pa1042SWages +
     paInterest +
     paDividends +
     paBusinessIncome +
@@ -144,7 +162,8 @@ export function calculatePATax(
     paCapGains +
     paRentalIncome +
     paRetirementTaxable +
-    paMisc;
+    paMisc +
+    paUnemployment;
 
   // ── PA Tax ────────────────────────────────────────────────────────────────────
   let paTax = paTaxableIncome * PA_TAX_RATE;
@@ -159,9 +178,12 @@ export function calculatePATax(
   }
 
   // ── PA Withholding ────────────────────────────────────────────────────────────
-  const paStateWithheld = input.w2Income
-    .filter((w) => w.state === "PA")
-    .reduce((s, w) => s + w.stateWithheld, 0);
+  const paStateWithheld =
+    input.w2Income.filter((w) => w.state === "PA").reduce((s, w) => s + w.stateWithheld, 0) +
+    // 1099-R state withholding for PA (retirement payers may withhold PA tax)
+    input.form1099R.reduce((s, r) => s + (r.stateWithheld ?? 0), 0) +
+    // 1099-G state withholding (unemployment agencies withhold PA tax)
+    (input.form1099G ?? []).reduce((s, f) => s + (f.stateWithheld ?? 0), 0);
 
   // Local EIT (Earned Income Tax) — paid to municipality, shown on PA return
   const paLocalEIT = input.stateTaxInfo?.paLocalEIT ?? 0;

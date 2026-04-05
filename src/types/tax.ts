@@ -320,6 +320,7 @@ export interface TaxReturnInput {
   foreignIncome?: ForeignIncome;
 
   // Adjustments to income
+  educatorExpenses?: number;      // Above-the-line deduction, max $300 ($600 MFJ if both educators)
   studentLoanInterest?: StudentLoanInterest;
   tuitionEducation: TuitionEducation[];
   retirementContributions: RetirementContributions;
@@ -434,6 +435,7 @@ export interface FederalTaxResult {
   refund: number;
   amountDue: number;
   underpaymentPenalty?: number;
+  capitalLossCarryforward?: number; // Amount carried forward to future years (exceeds $3k limit)
   effectiveTaxRate: number;
   marginalTaxRate: number;
 }

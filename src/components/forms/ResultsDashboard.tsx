@@ -203,29 +203,68 @@ export function ResultsDashboard({ result, returnId, input, onBack }: Props) {
                     {f.totalWages > 0 && <ResultRow label="W-2 Wages" value={f.totalWages} indent />}
                     {f.totalInterest > 0 && <ResultRow label="Interest Income" value={f.totalInterest} indent />}
                     {f.totalDividends > 0 && <ResultRow label="Ordinary Dividends" value={f.totalDividends} indent />}
-                    {f.qualifiedDividends > 0 && <ResultRow label="  Qualified Dividends (included)" value={f.qualifiedDividends} indent />}
-                    {f.totalCapitalGains !== 0 && <ResultRow label="Net Capital Gains" value={f.totalCapitalGains} indent />}
+                    {f.qualifiedDividends > 0 && <ResultRow label="  Qualified Dividends (included above)" value={f.qualifiedDividends} indent />}
+                    {f.totalCapitalGains !== 0 && <ResultRow label="Net Capital Gains / (Losses)" value={f.totalCapitalGains} indent />}
                     {f.iRADistributions > 0 && <ResultRow label="IRA Distributions" value={f.iRADistributions} indent />}
                     {f.pensionAnnuities > 0 && <ResultRow label="Pensions & Annuities" value={f.pensionAnnuities} indent />}
                     {f.scheduleCNetProfit !== 0 && <ResultRow label="Business Income (Schedule C)" value={f.scheduleCNetProfit} indent />}
-                    {f.scheduleENetIncome !== 0 && <ResultRow label="Rental Income (Schedule E)" value={f.scheduleENetIncome} indent />}
+                    {f.scheduleENetIncome !== 0 && <ResultRow label="Rental Income / (Loss) (Schedule E)" value={f.scheduleENetIncome} indent />}
                     {f.socialSecurityTaxable > 0 && <ResultRow label="Social Security (taxable portion)" value={f.socialSecurityTaxable} indent />}
-                    {f.otherIncome > 0 && <ResultRow label="Other Income" value={f.otherIncome} indent />}
+                    {f.otherIncome > 0 && <ResultRow label="Other Income (NEC, unemployment, foreign, 1042-S)" value={f.otherIncome} indent />}
                     <ResultRow label="Total Income" value={f.totalIncome} bold />
                   </div>
                 </div>
+                {f.totalAdjustments > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-800 mb-3">Adjustments (Schedule 1)</h4>
+                    <div className="space-y-0.5">
+                      {f.selfEmploymentTax > 0 && <ResultRow label="SE Tax Deduction (50% of SE tax)" value={f.selfEmploymentTax * 0.5} indent positive />}
+                      {(input.selfEmployedHealthInsurance ?? 0) > 0 && <ResultRow label="Self-Employed Health Insurance" value={Math.min(input.selfEmployedHealthInsurance!, f.scheduleCNetProfit)} indent positive />}
+                      {(input.retirementContributions.sep_ira + input.retirementContributions.simple_ira + input.retirementContributions.solo401k_traditional) > 0 && (
+                        <ResultRow label="SEP/SIMPLE/Solo 401(k) Deduction" value={input.retirementContributions.sep_ira + input.retirementContributions.simple_ira + input.retirementContributions.solo401k_traditional} indent positive />
+                      )}
+                      {(input.studentLoanInterest?.interestPaid ?? 0) > 0 && <ResultRow label="Student Loan Interest" value={Math.min(input.studentLoanInterest!.interestPaid, 2500)} indent positive />}
+                      {input.retirementContributions.hsa > 0 && <ResultRow label="HSA Deduction" value={input.retirementContributions.hsa} indent positive />}
+                      {(input.educatorExpenses ?? 0) > 0 && <ResultRow label="Educator Expenses" value={Math.min(input.educatorExpenses!, 300)} indent positive />}
+                      {(input.alimonyPaid ?? 0) > 0 && <ResultRow label="Alimony Paid" value={input.alimonyPaid!} indent positive />}
+                      <ResultRow label="Total Adjustments" value={f.totalAdjustments} bold positive />
+                      <ResultRow label="Adjusted Gross Income" value={f.adjustedGrossIncome} bold />
+                    </div>
+                  </div>
+                )}
                 <div>
-                  <h4 className="font-semibold text-gray-800 mb-3">Credits</h4>
+                  <h4 className="font-semibold text-gray-800 mb-3">Tax &amp; Credits</h4>
                   <div className="space-y-0.5">
-                    {f.childTaxCredit > 0 && <ResultRow label="Child Tax Credit" value={f.childTaxCredit} indent positive />}
-                    {f.earnedIncomeCredit > 0 && <ResultRow label="Earned Income Credit (EITC)" value={f.earnedIncomeCredit} indent positive />}
-                    {f.childCareCredit > 0 && <ResultRow label="Child & Dependent Care Credit" value={f.childCareCredit} indent positive />}
-                    {f.educationCredits > 0 && <ResultRow label="Education Credits" value={f.educationCredits} indent positive />}
-                    {f.foreignTaxCredit > 0 && <ResultRow label="Foreign Tax Credit" value={f.foreignTaxCredit} indent positive />}
-                    {f.retirementSaverCredit > 0 && <ResultRow label="Retirement Saver's Credit" value={f.retirementSaverCredit} indent positive />}
-                    <ResultRow label="Total Credits" value={f.totalCredits} bold positive />
+                    <ResultRow label={f.isItemized ? "Itemized Deductions (Sch. A)" : "Standard Deduction"} value={f.standardOrItemizedDeduction} indent positive />
+                    {f.qualifiedBusinessIncomeDeduction > 0 && <ResultRow label="QBI Deduction (§199A)" value={f.qualifiedBusinessIncomeDeduction} indent positive />}
+                    <ResultRow label="Taxable Income" value={f.taxableIncome} bold />
+                    <ResultRow label="Income Tax" value={f.regularTax} indent />
+                    {f.selfEmploymentTax > 0 && <ResultRow label="Self-Employment Tax" value={f.selfEmploymentTax} indent />}
+                    {f.alternativeMinimumTax > 0 && <ResultRow label="Alternative Minimum Tax" value={f.alternativeMinimumTax} indent negative />}
+                    {f.netInvestmentIncomeTax > 0 && <ResultRow label="Net Investment Income Tax (3.8%)" value={f.netInvestmentIncomeTax} indent negative />}
+                    {f.additionalMedicareTax > 0 && <ResultRow label="Additional Medicare Tax (0.9%)" value={f.additionalMedicareTax} indent negative />}
+                    <ResultRow label="Total Tax" value={f.totalTax} bold />
                   </div>
                 </div>
+                <div>
+                  <h4 className="font-semibold text-gray-800 mb-3">Credits Applied</h4>
+                  <div className="space-y-0.5">
+                    {f.childTaxCredit > 0 && <ResultRow label="Child Tax Credit / ACTC" value={f.childTaxCredit} indent positive />}
+                    {f.earnedIncomeCredit > 0 && <ResultRow label="Earned Income Credit (EITC)" value={f.earnedIncomeCredit} indent positive />}
+                    {f.childCareCredit > 0 && <ResultRow label="Child & Dependent Care Credit" value={f.childCareCredit} indent positive />}
+                    {f.educationCredits > 0 && <ResultRow label="Education Credits (AOTC/LLC)" value={f.educationCredits} indent positive />}
+                    {f.foreignTaxCredit > 0 && <ResultRow label="Foreign Tax Credit" value={f.foreignTaxCredit} indent positive />}
+                    {f.retirementSaverCredit > 0 && <ResultRow label="Retirement Saver's Credit" value={f.retirementSaverCredit} indent positive />}
+                    {f.otherCredits > 0 && <ResultRow label="Other Credits (Energy, EV, Adoption)" value={f.otherCredits} indent positive />}
+                    <ResultRow label="Total Credits" value={f.totalCredits} bold positive />
+                    <ResultRow label="Total Withholding & Payments" value={f.totalPayments} bold positive />
+                  </div>
+                </div>
+                {f.capitalLossCarryforward && f.capitalLossCarryforward > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                    <strong>Capital Loss Carryforward:</strong> ${Math.round(f.capitalLossCarryforward).toLocaleString()} carries forward to your 2026 return. Record this on Schedule D Worksheet.
+                  </div>
+                )}
               </div>
             )}
 

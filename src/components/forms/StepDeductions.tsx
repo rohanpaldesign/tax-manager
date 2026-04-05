@@ -96,6 +96,8 @@ export function StepDeductions({ input, update, onNext, onBack }: Props) {
         <h3 className="font-semibold text-gray-800">Adjustments to Income (Above-the-Line)</h3>
         <p className="text-xs text-gray-400">These reduce your AGI regardless of whether you itemize.</p>
         <div className="grid grid-cols-2 gap-4">
+          <NumberInput label="Educator Expenses (K–12 teachers)" value={input.educatorExpenses ?? 0}
+            onChange={v => update({ educatorExpenses: v })} hint="Max $300 ($600 if MFJ both educators)" />
           <NumberInput label="Student Loan Interest (Form 1098-E)" value={input.studentLoanInterest?.interestPaid ?? 0}
             onChange={v => update({ studentLoanInterest: { interestPaid: v } })} hint="Max deduction: $2,500" />
           <NumberInput label="Self-Employed Health Insurance" value={input.selfEmployedHealthInsurance ?? 0}
