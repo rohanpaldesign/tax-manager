@@ -105,7 +105,7 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
   const remove1099R = (i: number) => update({ form1099R: input.form1099R.filter((_, idx) => idx !== i) });
 
   const add1099G = () => {
-    update({ form1099G: [...(input.form1099G ?? []), { payerName: "", unemploymentCompensation: 0, federalWithheld: 0 }] });
+    update({ form1099G: [...(input.form1099G ?? []), { payerName: "", unemploymentCompensation: 0, federalWithheld: 0, stateWithheld: 0 }] });
   };
   const update1099G = (i: number, patch: Partial<Form1099G>) => {
     update({ form1099G: (input.form1099G ?? []).map((f, idx) => idx === i ? { ...f, ...patch } : f) });
@@ -713,6 +713,7 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
                   <NumberInput label="Unemployment Compensation (Box 1)" value={f.unemploymentCompensation} onChange={v => update1099G(i, { unemploymentCompensation: v })} />
                   <NumberInput label="State/Local Tax Refund (Box 2)" value={f.stateOrLocalRefund ?? 0} onChange={v => update1099G(i, { stateOrLocalRefund: v })} hint="Taxable only if you itemized last year" />
                   <NumberInput label="Federal Tax Withheld (Box 4)" value={f.federalWithheld} onChange={v => update1099G(i, { federalWithheld: v })} />
+                  <NumberInput label="State Tax Withheld (Box 11)" value={f.stateWithheld ?? 0} onChange={v => update1099G(i, { stateWithheld: v })} hint="Used for state return withholding" />
                 </div>
                 {(f.stateOrLocalRefund ?? 0) > 0 && (
                   <label className="flex items-center gap-2 text-sm mt-1">

@@ -534,10 +534,13 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   const standardOrItemized = isItemized ? scheduleATotal : standardDeduction;
   const saltPaid = isItemized ? totalSALT : 0;
 
-  // QBI Deduction (Section 199A)
+  // Nonresident alien flag — needed here for QBI and again below for credits
+  const isNRA = input.residencyStatus === "nonresident";
+
+  // QBI Deduction (Section 199A) — NRAs are not eligible (IRC §199A applies to US persons only)
   const qbiNetIncome = Math.max(0, scheduleC_grossProfit + nec1099Income + scheduleE_net);
   const taxableIncomeBeforeQBI = clamp(adjustedGrossIncome - standardOrItemized - traditionalIRADeductible);
-  const qbiDeduction = computeQBIDeduction(qbiNetIncome, taxableIncomeBeforeQBI, fs);
+  const qbiDeduction = !isNRA ? computeQBIDeduction(qbiNetIncome, taxableIncomeBeforeQBI, fs) : 0;
 
   const taxableIncome = clamp(taxableIncomeBeforeQBI - qbiDeduction);
 
@@ -593,9 +596,6 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
 
   const earnedIncome = totalWages + seSelfEmploymentIncome;
   const investmentIncome = totalInterest + totalOrdinaryDividends + clamp(netCapitalGain);
-
-  // Nonresident aliens are not eligible for EITC or CTC (most NRAs)
-  const isNRA = input.residencyStatus === "nonresident";
 
   // NRAs generally cannot claim CTC (no SSN-based child credits for most visa holders)
   const ctcResult = !isNRA
