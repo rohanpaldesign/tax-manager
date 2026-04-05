@@ -1,6 +1,7 @@
 // ─── Determines which IRS forms are required based on the tax situation ───────
 
 import type { TaxReturnInput, FederalTaxResult } from "@/types/tax";
+import { sortFormsByAttachmentOrder } from "./instructions";
 
 export function determineRequiredForms(
   input: TaxReturnInput,
@@ -8,8 +9,12 @@ export function determineRequiredForms(
 ): string[] {
   const forms = new Set<string>();
 
-  // Always required
-  forms.add("Form 1040");
+  // Always required — 1040-NR for nonresident aliens
+  if (input.residencyStatus === "nonresident") {
+    forms.add("Form 1040-NR");
+  } else {
+    forms.add("Form 1040");
+  }
 
   // W-2 income
   if (input.w2Income.length > 0) forms.add("W-2");
@@ -63,6 +68,18 @@ export function determineRequiredForms(
 
   // 1099-MISC
   if (input.form1099MISC.length > 0) forms.add("Form 1099-MISC");
+
+  // 1099-G (Unemployment / State refunds)
+  if ((input.form1099G ?? []).length > 0) forms.add("Form 1099-G");
+
+  // 1042-S (NRA income / treaty)
+  if ((input.form1042S ?? []).length > 0) {
+    forms.add("Form 1042-S");
+    // If any 1042-S has treaty exemption, Form 8833 may be required
+    if (input.form1042S.some((f) => f.exemptionCode === "04" || f.exemptedIncome)) {
+      forms.add("Form 8833 (Treaty Benefits Disclosure)");
+    }
+  }
 
   // Itemized deductions
   if (federal.isItemized) {
@@ -132,5 +149,5 @@ export function determineRequiredForms(
   // Underpayment
   if (federal.underpaymentPenalty) forms.add("Form 2210 (Underpayment Penalty)");
 
-  return Array.from(forms).sort();
+  return sortFormsByAttachmentOrder(Array.from(forms));
 }

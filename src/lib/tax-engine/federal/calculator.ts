@@ -346,6 +346,19 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     0
   );
 
+  // 1099-G: unemployment is fully taxable; state/local refund taxable only if prior year itemized
+  const g1099Income = (input.form1099G ?? []).reduce((s, f) => {
+    const uc = f.unemploymentCompensation;
+    const refund = f.priorYearItemized ? (f.stateOrLocalRefund ?? 0) : 0;
+    return s + uc + refund;
+  }, 0);
+
+  // 1042-S: gross income minus any treaty-exempt portion
+  const s1042Income = (input.form1042S ?? []).reduce((s, f) => {
+    const taxable = Math.max(0, f.grossIncome - (f.exemptedIncome ?? 0));
+    return s + taxable;
+  }, 0);
+
   // Social Security (pre-AGI; we'll adjust later)
   const ssBenefits = input.socialSecurity?.netBenefits ?? 0;
 
@@ -369,6 +382,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     scheduleE_grossNet +
     miscOtherIncome +
     nec1099Income +
+    g1099Income +
+    s1042Income +
     foreignIncomeIncluded;
 
   // ── Step 2: Self-Employment Tax ──────────────────────────────────────────────
@@ -490,7 +505,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     medicalDeductible +
     (input.casualtyLosses ?? 0);
 
-  const standardDeduction = C.STANDARD_DEDUCTION[fs];
+  // Nonresident aliens cannot claim the standard deduction (must itemize or $0)
+  const standardDeduction = input.residencyStatus === "nonresident" ? 0 : C.STANDARD_DEDUCTION[fs];
   const isItemized = scheduleATotal > standardDeduction;
   const standardOrItemized = isItemized ? scheduleATotal : standardDeduction;
   const saltPaid = isItemized ? totalSALT : 0;
@@ -538,8 +554,14 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
       ? (totalWages - addlMedicareThreshold) * C.ADDITIONAL_MEDICARE_TAX_RATE
       : 0;
 
+  // ── 10% Early Withdrawal Penalty (IRC §72(t)) ─────────────────────────────
+  // Applies to 1099-R distribution code "1" (early, no exception)
+  const earlyWithdrawalPenalty10pct = (input.form1099R ?? [])
+    .filter((r) => r.distributionCode === "1")
+    .reduce((s, r) => s + r.taxableAmount * 0.10, 0);
+
   const totalTaxBeforeCredits =
-    regularTax + alternativeMinimumTax + netInvestmentIncomeTax + seTax + additionalMedicareTax;
+    regularTax + alternativeMinimumTax + netInvestmentIncomeTax + seTax + additionalMedicareTax + earlyWithdrawalPenalty10pct;
 
   // ── Step 8: Credits ────────────────────────────────────────────────────────
   const numQualifyingChildren = input.dependents.filter((d) => d.childTaxCreditEligible).length;
@@ -549,15 +571,17 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   const earnedIncome = totalWages + seSelfEmploymentIncome;
   const investmentIncome = totalInterest + totalOrdinaryDividends + clamp(netCapitalGain);
 
-  const { nonRefundable: ctcNonRefundable, refundable: ctcRefundable } = computeChildTaxCredit(
-    numQualifyingChildren,
-    numOtherDependents,
-    adjustedGrossIncome,
-    fs,
-    earnedIncome
-  );
+  // Nonresident aliens are not eligible for EITC or CTC (most NRAs)
+  const isNRA = input.residencyStatus === "nonresident";
 
-  const eitc = computeEITC(adjustedGrossIncome, earnedIncome, numEITCChildren, fs, investmentIncome);
+  // NRAs generally cannot claim CTC (no SSN-based child credits for most visa holders)
+  const ctcResult = !isNRA
+    ? computeChildTaxCredit(numQualifyingChildren, numOtherDependents, adjustedGrossIncome, fs, earnedIncome)
+    : { nonRefundable: 0, refundable: 0 };
+  const { nonRefundable: ctcNonRefundable, refundable: ctcRefundable } = ctcResult;
+  const eitc = !isNRA
+    ? computeEITC(adjustedGrossIncome, earnedIncome, numEITCChildren, fs, investmentIncome)
+    : 0;
 
   // Child & Dependent Care Credit (Form 2441)
   const childCareExpenses = input.childCareExpenses ?? 0;
@@ -582,6 +606,31 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     }
   }
 
+  // Residential Energy Credits (Form 5695) — user enters pre-computed credit amount
+  const energyCreditAmt = input.energyCredits ?? 0;
+
+  // Adoption Credit (Form 8839) — simplified: $1 credit per $1 of expenses up to $16,810
+  // Phase-out: $239,230–$279,230 (2025 estimates). Nonrefundable.
+  let adoptionCredit = 0;
+  if ((input.adoptionExpenses ?? 0) > 0) {
+    const maxAdoption = 16_810;
+    const adoptionPhaseoutStart = 239_230;
+    const adoptionPhaseoutRange = 40_000;
+    const adoptionBase = Math.min(input.adoptionExpenses!, maxAdoption);
+    if (adjustedGrossIncome <= adoptionPhaseoutStart) {
+      adoptionCredit = adoptionBase;
+    } else if (adjustedGrossIncome < adoptionPhaseoutStart + adoptionPhaseoutRange) {
+      adoptionCredit = adoptionBase * (1 - (adjustedGrossIncome - adoptionPhaseoutStart) / adoptionPhaseoutRange);
+    }
+  }
+
+  // Clean Vehicle Credit (IRC §30D) — $7,500 for eligible new EVs, subject to income limits
+  let evCredit = 0;
+  if (input.electricVehicleCredit) {
+    const evIncomeLimit = fs === "married_filing_jointly" ? 300_000 : fs === "head_of_household" ? 225_000 : 150_000;
+    if (adjustedGrossIncome <= evIncomeLimit) evCredit = 7_500;
+  }
+
   // Retirement Saver's Credit
   let retirementSaverCredit = 0;
   const totalRetirementContribs =
@@ -603,7 +652,7 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   }
 
   const totalNonRefundableCredits = clamp(
-    ctcNonRefundable + childCareCredit + foreignTaxCredit + educationCredits + retirementSaverCredit,
+    ctcNonRefundable + childCareCredit + foreignTaxCredit + educationCredits + retirementSaverCredit + energyCreditAmt + adoptionCredit + evCredit,
     0,
     totalTaxBeforeCredits
   );
@@ -622,6 +671,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     input.form1099INT.reduce((s, f) => s + f.federalWithheld, 0) +
     input.form1099B.reduce((s, f) => s + f.federalWithheld, 0) +
     input.form1099R.reduce((s, f) => s + f.federalWithheld, 0) +
+    (input.form1099G ?? []).reduce((s, f) => s + f.federalWithheld, 0) +
+    (input.form1042S ?? []).reduce((s, f) => s + f.taxWithheld, 0) +
     (input.socialSecurity?.federalWithheld ?? 0);
   const totalWithheld = w2Withheld + otherWithheld;
   const estimatedTaxPaid = input.estimatedTaxPayments + (input.priorYearOverpaymentApplied ?? 0);

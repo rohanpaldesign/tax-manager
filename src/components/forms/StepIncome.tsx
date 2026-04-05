@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { TaxReturnInput, W2Income, Form1099NEC, Form1099DIV, Form1099INT, Form1099B, Form1099R, ScheduleCBusiness } from "@/types/tax";
+import type { TaxReturnInput, W2Income, Form1099NEC, Form1099DIV, Form1099INT, Form1099B, Form1099R, Form1099G, Form1042S, ScheduleCBusiness } from "@/types/tax";
 
 interface Props {
   input: TaxReturnInput;
@@ -10,7 +10,7 @@ interface Props {
   onBack: () => void;
 }
 
-type IncomeSection = "w2" | "1099nec" | "1099div" | "1099int" | "1099b" | "1099r" | "scheduleC" | "rental" | "ss" | "foreign";
+type IncomeSection = "w2" | "1099nec" | "1099div" | "1099int" | "1099b" | "1099r" | "1099g" | "1042s" | "scheduleC" | "rental" | "ss" | "foreign";
 
 const money = (n: number) => n ? `$${n.toLocaleString()}` : "";
 
@@ -104,6 +104,22 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
   };
   const remove1099R = (i: number) => update({ form1099R: input.form1099R.filter((_, idx) => idx !== i) });
 
+  const add1099G = () => {
+    update({ form1099G: [...(input.form1099G ?? []), { payerName: "", unemploymentCompensation: 0, federalWithheld: 0 }] });
+  };
+  const update1099G = (i: number, patch: Partial<Form1099G>) => {
+    update({ form1099G: (input.form1099G ?? []).map((f, idx) => idx === i ? { ...f, ...patch } : f) });
+  };
+  const remove1099G = (i: number) => update({ form1099G: (input.form1099G ?? []).filter((_, idx) => idx !== i) });
+
+  const add1042S = () => {
+    update({ form1042S: [...(input.form1042S ?? []), { payerName: "", incomeCode: "16", grossIncome: 0, taxWithheld: 0 }] });
+  };
+  const update1042S = (i: number, patch: Partial<Form1042S>) => {
+    update({ form1042S: (input.form1042S ?? []).map((f, idx) => idx === i ? { ...f, ...patch } : f) });
+  };
+  const remove1042S = (i: number) => update({ form1042S: (input.form1042S ?? []).filter((_, idx) => idx !== i) });
+
   const totalIncome = [
     ...input.w2Income.map(w => w.wages),
     ...input.form1099NEC.map(f => f.nonemployeeCompensation),
@@ -168,6 +184,9 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
                   <NumberInput label="Medicare Tax Withheld (Box 6)" value={w.medicareWithheld} onChange={v => updateW2(i, { medicareWithheld: v })} />
                   <NumberInput label="State Wages (Box 16)" value={w.stateWages} onChange={v => updateW2(i, { stateWages: v })} />
                   <NumberInput label="State Tax Withheld (Box 17)" value={w.stateWithheld} onChange={v => updateW2(i, { stateWithheld: v })} />
+                  {w.state === "CA" && (
+                    <NumberInput label="CA SDI Withheld (Box 14)" value={w.box14CaSdi ?? 0} onChange={v => updateW2(i, { box14CaSdi: v })} hint="CA State Disability Insurance — deductible on CA return" />
+                  )}
                 </div>
               </div>
             ))}
@@ -334,6 +353,12 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
                   <NumberInput label="Wash Sale Loss Disallowed" value={f.washSaleLossDisallowed ?? 0} onChange={v => update1099B(i, { washSaleLossDisallowed: v })} />
                   <NumberInput label="Federal Tax Withheld (Box 4)" value={f.federalWithheld} onChange={v => update1099B(i, { federalWithheld: v })} />
                 </div>
+                {f.longTermOrShortTerm === "long" && (
+                  <label className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                    <input type="checkbox" checked={f.waRealEstate ?? false} onChange={e => update1099B(i, { waRealEstate: e.target.checked })} />
+                    Washington real estate sale — exempt from WA Capital Gains Tax
+                  </label>
+                )}
                 <div className="text-xs font-medium">
                   {f.proceeds - f.costBasis >= 0
                     ? <span className="text-green-600">Gain: ${(f.proceeds - f.costBasis).toLocaleString()}</span>
@@ -654,6 +679,114 @@ export function StepIncome({ input, update, onNext, onBack }: Props) {
                 </button>
               )}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* 1099-G — Unemployment / State Refunds */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button onClick={() => toggle("1099g")} className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">📋</span>
+            <div className="text-left">
+              <div className="font-medium text-gray-900">1099-G (Unemployment / State Tax Refund)</div>
+              <div className="text-xs text-gray-400">{(input.form1099G ?? []).length} form(s) · {money((input.form1099G ?? []).reduce((s, f) => s + f.unemploymentCompensation, 0))}</div>
+            </div>
+          </div>
+          <span className="text-gray-400">{openSection === "1099g" ? "▲" : "▼"}</span>
+        </button>
+        {openSection === "1099g" && (
+          <div className="border-t border-gray-100 p-5 space-y-4 bg-gray-50">
+            <p className="text-xs text-gray-500">Unemployment compensation is fully taxable federally. A state/local tax refund is taxable only if you itemized deductions in the prior year.</p>
+            {(input.form1099G ?? []).map((f, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">1099-G #{i + 1}</span>
+                  <button onClick={() => remove1099G(i)} className="text-red-400 text-xs hover:text-red-600">Remove</button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <input type="text" value={f.payerName} onChange={e => update1099G(i, { payerName: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="State EDD / DOL" />
+                  </div>
+                  <NumberInput label="Unemployment Compensation (Box 1)" value={f.unemploymentCompensation} onChange={v => update1099G(i, { unemploymentCompensation: v })} />
+                  <NumberInput label="State/Local Tax Refund (Box 2)" value={f.stateOrLocalRefund ?? 0} onChange={v => update1099G(i, { stateOrLocalRefund: v })} hint="Taxable only if you itemized last year" />
+                  <NumberInput label="Federal Tax Withheld (Box 4)" value={f.federalWithheld} onChange={v => update1099G(i, { federalWithheld: v })} />
+                </div>
+                {(f.stateOrLocalRefund ?? 0) > 0 && (
+                  <label className="flex items-center gap-2 text-sm mt-1">
+                    <input type="checkbox" checked={f.priorYearItemized ?? false} onChange={e => update1099G(i, { priorYearItemized: e.target.checked })} />
+                    I itemized deductions on my 2024 federal return (makes Box 2 taxable)
+                  </label>
+                )}
+              </div>
+            ))}
+            <button onClick={add1099G} className="w-full border-2 border-dashed border-blue-200 rounded-xl py-3 text-blue-600 text-sm font-medium hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              + Add 1099-G
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 1042-S — Foreign Person's US Source Income */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button onClick={() => toggle("1042s")} className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🎓</span>
+            <div className="text-left">
+              <div className="font-medium text-gray-900">1042-S (NRA Scholarships / Fellowship / Treaty Income)</div>
+              <div className="text-xs text-gray-400">{(input.form1042S ?? []).length} form(s) · {money((input.form1042S ?? []).reduce((s, f) => s + f.grossIncome, 0))}</div>
+            </div>
+          </div>
+          <span className="text-gray-400">{openSection === "1042s" ? "▲" : "▼"}</span>
+        </button>
+        {openSection === "1042s" && (
+          <div className="border-t border-gray-100 p-5 space-y-4 bg-gray-50">
+            <p className="text-xs text-gray-500">Form 1042-S reports US-source income paid to nonresident aliens — typically scholarships, fellowship stipends, or wages subject to treaty withholding.</p>
+            {(input.form1042S ?? []).map((f, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">1042-S #{i + 1}</span>
+                  <button onClick={() => remove1042S(i)} className="text-red-400 text-xs hover:text-red-600">Remove</button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <input type="text" value={f.payerName} onChange={e => update1042S(i, { payerName: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="University / Employer" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Income Code (Box 1)</label>
+                    <select value={f.incomeCode} onChange={e => update1042S(i, { incomeCode: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      <option value="15">15 — Scholarships / Fellowships (taxable portion)</option>
+                      <option value="16">16 — Scholarship / Fellowship (treaty exempt)</option>
+                      <option value="17">17 — Independent personal services</option>
+                      <option value="18">18 — Dependent personal services (wages)</option>
+                      <option value="19">19 — Wages (non-compensatory)</option>
+                      <option value="20">20 — Other income</option>
+                    </select>
+                  </div>
+                  <NumberInput label="Gross Income (Box 2)" value={f.grossIncome} onChange={v => update1042S(i, { grossIncome: v })} />
+                  <NumberInput label="Tax Withheld (Box 7a)" value={f.taxWithheld} onChange={v => update1042S(i, { taxWithheld: v })} />
+                  <NumberInput label="Treaty-Exempt Amount" value={f.exemptedIncome ?? 0} onChange={v => update1042S(i, { exemptedIncome: v })} hint="Portion excluded under tax treaty (reduces taxable income)" />
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Treaty Country</label>
+                    <input type="text" value={f.treatyCountry ?? ""} onChange={e => update1042S(i, { treatyCountry: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="China, India, etc." />
+                  </div>
+                </div>
+                {(f.exemptedIncome ?? 0) > 0 && (
+                  <div className="text-xs text-green-700 bg-green-50 p-2 rounded">
+                    Treaty exempt: ${(f.exemptedIncome ?? 0).toLocaleString()} excluded. Taxable amount: ${Math.max(0, f.grossIncome - (f.exemptedIncome ?? 0)).toLocaleString()}. Form 8833 may be required.
+                  </div>
+                )}
+              </div>
+            ))}
+            <button onClick={add1042S} className="w-full border-2 border-dashed border-blue-200 rounded-xl py-3 text-blue-600 text-sm font-medium hover:border-blue-400 hover:bg-blue-50 transition-colors">
+              + Add 1042-S
+            </button>
           </div>
         )}
       </div>

@@ -68,6 +68,8 @@ const emptyInput: TaxReturnInput = {
   form1099INT: [],
   form1099B: [],
   form1099R: [],
+  form1099G: [],
+  form1042S: [],
   scheduleC: [],
   rentalProperties: [],
   capitalAssetSales: [],

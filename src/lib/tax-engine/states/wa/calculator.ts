@@ -46,17 +46,15 @@ export function calculateWATax(
 
   // ── WA Long-Term Capital Gains Tax ───────────────────────────────────────────
   // Applies to long-term capital gains above $270,000
-  // Exemptions: real estate, retirement accounts, small business assets
+  // Exemptions: real estate (waRealEstate flag), retirement accounts, small business
   const ltcgFromB = input.form1099B
-    .filter((b) => b.longTermOrShortTerm === "long")
+    .filter((b) => b.longTermOrShortTerm === "long" && !b.waRealEstate)
     .reduce((s, b) => s + Math.max(0, b.proceeds - b.costBasis), 0);
   const ltcgFromSales = input.capitalAssetSales
-    .filter((a) => a.longTermOrShortTerm === "long")
+    .filter((a) => a.longTermOrShortTerm === "long" && !a.waRealEstate)
     .reduce((s, a) => s + Math.max(0, a.proceeds - a.costBasis + (a.adjustments ?? 0)), 0);
-  const ltcgDividends = input.form1099DIV.reduce(
-    (s, f) => s + f.totalCapitalGainDistr,
-    0
-  );
+  // 1099-DIV cap gain distributions are not WA-taxable (from mutual funds/ETFs, not direct sales)
+  const ltcgDividends = 0;
 
   const totalLTCG = ltcgFromB + ltcgFromSales + ltcgDividends;
   const waLTCGTaxable = Math.max(0, totalLTCG - WA_LTCG_THRESHOLD);

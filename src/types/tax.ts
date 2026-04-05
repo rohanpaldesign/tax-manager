@@ -29,6 +29,7 @@ export interface W2Income {
   state: StateCode | string;
   localWages?: number;
   localWithheld?: number;
+  box14CaSdi?: number;        // Box 14: CA SDI withheld (deductible on CA return)
 }
 
 export interface Form1099NEC {
@@ -86,6 +87,27 @@ export interface Form1099B {
   basisReportedToIRS: boolean;
   washSaleLossDisallowed?: number;
   adjustmentCode?: string;
+  waRealEstate?: boolean;     // WA LTCG: real estate gains are exempt from WA capital gains tax
+}
+
+export interface Form1099G {
+  payerName: string;                   // State agency or federal payer
+  unemploymentCompensation: number;    // Box 1 — fully taxable federally
+  stateOrLocalRefund?: number;         // Box 2 — taxable only if prior year was itemized
+  priorYearItemized?: boolean;         // Whether taxpayer itemized in the prior year
+  federalWithheld: number;             // Box 4
+  stateWithheld?: number;              // Box 11
+}
+
+export interface Form1042S {
+  payerName: string;
+  incomeCode: string;                  // Box 1: 16=scholarship, 17=independent, 18=dependent, 19=wages
+  grossIncome: number;                 // Box 2
+  taxWithheld: number;                 // Box 7a
+  exemptionCode?: string;              // Box 6 (04=treaty exempt)
+  treatyCountry?: string;              // Box 13g
+  treatyArticle?: string;              // Box 13h
+  exemptedIncome?: number;             // Amount exempt under treaty (reduces taxable gross)
 }
 
 export interface Form1099R {
@@ -180,6 +202,7 @@ export interface CapitalAssetSale {
   longTermOrShortTerm: "short" | "long";
   basisReportedToIRS: boolean;
   washSaleLossDisallowed?: number;
+  waRealEstate?: boolean;     // WA LTCG: real estate is exempt from WA capital gains tax
 }
 
 export interface ForeignIncome {
@@ -288,6 +311,8 @@ export interface TaxReturnInput {
   form1099INT: Form1099INT[];
   form1099B: Form1099B[];
   form1099R: Form1099R[];
+  form1099G: Form1099G[];
+  form1042S: Form1042S[];
   socialSecurity?: SocialSecurityBenefits;
   scheduleC: ScheduleCBusiness[];
   rentalProperties: RentalProperty[];

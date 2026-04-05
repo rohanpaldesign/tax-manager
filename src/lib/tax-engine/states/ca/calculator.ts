@@ -86,8 +86,10 @@ const CA_PERSONAL_EXEMPTION_CREDIT: Record<FilingStatus, number> = {
 };
 const CA_DEPENDENT_EXEMPTION_CREDIT = 433;
 
-// CA SDI (State Disability Insurance) — withheld by employer, not a deduction
-const CA_SDI_RATE = 0.009; // 0.9% on all wages (no wage cap since 2024)
+// CalEITC thresholds (2025 estimated)
+// Phase-in/phase-out schedule by qualifying children count
+const CALEITC_MAX_CREDIT: Record<number, number> = { 0: 285, 1: 1_905, 2: 3_137, 3: 3_529 };
+const CALEITC_MAX_EARNED: Record<number, number> = { 0: 22_302, 1: 49_502, 2: 49_502, 3: 49_502 };
 
 // Mental Health Services Tax: 1% on income over $1M (already in brackets above)
 
@@ -107,7 +109,8 @@ function applyBrackets(
 export function calculateCATax(
   input: TaxReturnInput,
   federalAGI: number,
-  federalTaxableSS: number = 0
+  federalTaxableSS: number = 0,
+  federalEarnedIncome: number = 0
 ): StateTaxResult {
   const fs = input.filingStatus;
 
@@ -129,6 +132,7 @@ export function calculateCATax(
 
   // CA itemized deductions — similar to federal but:
   // - No SALT cap (CA allows full state/local taxes deduction on CA return)
+  // - CA SDI withheld (W-2 Box 14) is deductible as a state tax on CA return
   // - Mortgage interest same rules
   let caItemizedDeduction = 0;
   if (input.itemize || input.homeOwnership) {
@@ -138,38 +142,69 @@ export function calculateCATax(
     const charitableNonCash = input.charitableContributions?.nonCashContributions ?? 0;
     const medicalThreshold = caAGI * 0.075;
     const medicalDeductible = Math.max(0, (input.medicalExpenses?.totalMedicalExpenses ?? 0) - medicalThreshold);
+    // CA SDI is a state income tax — deductible on CA return (no SALT cap issue at state level)
+    const caSdi = input.w2Income
+      .filter((w) => w.state === "CA")
+      .reduce((s, w) => s + (w.box14CaSdi ?? 0), 0);
     caItemizedDeduction =
       propertyTax +
       mortgageInterest +
       charitableCash +
       charitableNonCash +
-      medicalDeductible;
+      medicalDeductible +
+      caSdi;
   }
 
   const caDeduction = Math.max(caStandardDeduction, caItemizedDeduction);
   const caTaxableIncome = Math.max(0, caAGI - caDeduction);
   const caTaxBeforeCredits = applyBrackets(caTaxableIncome, CA_BRACKETS[fs]);
 
-  // Credits
+  // ── Credits ──────────────────────────────────────────────────────────────────
   let caCredits = CA_PERSONAL_EXEMPTION_CREDIT[fs];
   caCredits += input.dependents.length * CA_DEPENDENT_EXEMPTION_CREDIT;
 
-  // CA Renter's Credit (non-refundable)
+  // CA Renter's Credit (non-refundable) — income limit: $50k single, $100k MFJ
   if (input.stateTaxInfo?.caRenterCredit) {
-    const renterCredit = fs === "married_filing_jointly" ? 120 : 60;
-    caCredits += renterCredit;
+    const renterIncomeLimit = fs === "married_filing_jointly" ? 100_000 : 50_000;
+    if (caAGI <= renterIncomeLimit) {
+      const renterCredit = fs === "married_filing_jointly" ? 120 : 60;
+      caCredits += renterCredit;
+    }
   }
 
-  // CA Young Child Tax Credit ($1,117 per qualifying child under 6)
-  if (input.stateTaxInfo?.caYoungChildCredit) {
+  // CA Young Child Tax Credit ($1,117 per qualifying child under 6 as of Dec 31, 2025)
+  // Phase-out at ~$63k AGI
+  if (input.stateTaxInfo?.caYoungChildCredit && caAGI <= 63_000) {
     const youngChildren = input.dependents.filter((d) => {
-      const age = new Date().getFullYear() - new Date(d.dateOfBirth).getFullYear();
-      return age < 6;
+      if (!d.dateOfBirth) return false;
+      const dob = new Date(d.dateOfBirth);
+      // Child must be under 6 as of December 31, 2025
+      const ageOnDec31 = 2025 - dob.getFullYear() - (
+        (dob.getMonth() > 11 || (dob.getMonth() === 11 && dob.getDate() > 31)) ? 1 : 0
+      );
+      return ageOnDec31 < 6;
     }).length;
     caCredits += youngChildren * 1_117;
   }
 
-  const caTax = Math.max(0, caTaxBeforeCredits - caCredits);
+  const nonRefundableCaTax = Math.max(0, caTaxBeforeCredits - caCredits);
+
+  // ── CalEITC (California Earned Income Tax Credit — REFUNDABLE) ───────────────
+  // Available to CA residents with earned income below threshold; NRA ineligible
+  let calEITC = 0;
+  if (input.residencyStatus !== "nonresident" && federalEarnedIncome > 0) {
+    const numChildren = Math.min(input.dependents.filter((d) => d.eitcEligible).length, 3);
+    const maxEarned = CALEITC_MAX_EARNED[numChildren] ?? 0;
+    if (federalEarnedIncome <= maxEarned) {
+      // Simplified linear interpolation: full credit at mid-range
+      const maxCredit = CALEITC_MAX_CREDIT[numChildren] ?? 0;
+      // Phase-out: credit reduces to 0 at maxEarned
+      const ratio = 1 - (federalEarnedIncome / maxEarned);
+      calEITC = Math.round(maxCredit * Math.max(0, Math.min(1, ratio * 2.5)));
+    }
+  }
+
+  const caTax = Math.max(0, nonRefundableCaTax) - calEITC;
 
   // CA withholding
   const caWithheld = input.w2Income

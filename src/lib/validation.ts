@@ -19,6 +19,7 @@ const W2Schema = z.object({
   state: z.string().default(""),
   localWages: money.optional(),
   localWithheld: money.optional(),
+  box14CaSdi: money.optional(),
 });
 
 const NEC1099Schema = z.object({
@@ -76,6 +77,27 @@ const B1099Schema = z.object({
   basisReportedToIRS: z.boolean().default(true),
   washSaleLossDisallowed: money.optional(),
   adjustmentCode: z.string().optional(),
+  waRealEstate: z.boolean().optional(),
+});
+
+const G1099Schema = z.object({
+  payerName: z.string().default(""),
+  unemploymentCompensation: money,
+  stateOrLocalRefund: money.optional(),
+  priorYearItemized: z.boolean().optional(),
+  federalWithheld: money,
+  stateWithheld: money.optional(),
+});
+
+const S1042Schema = z.object({
+  payerName: z.string().default(""),
+  incomeCode: z.string().default("16"),
+  grossIncome: money,
+  taxWithheld: money,
+  exemptionCode: z.string().optional(),
+  treatyCountry: z.string().optional(),
+  treatyArticle: z.string().optional(),
+  exemptedIncome: money.optional(),
 });
 
 const R1099Schema = z.object({
@@ -164,6 +186,7 @@ const CapitalAssetSchema = z.object({
   longTermOrShortTerm: z.enum(["short", "long"]),
   basisReportedToIRS: z.boolean().default(true),
   washSaleLossDisallowed: money.optional(),
+  waRealEstate: z.boolean().optional(),
 });
 
 const DependentSchema = z.object({
@@ -235,6 +258,8 @@ export const TaxReturnInputSchema = z.object({
   form1099INT: z.array(INT1099Schema).default([]),
   form1099B: z.array(B1099Schema).default([]),
   form1099R: z.array(R1099Schema).default([]),
+  form1099G: z.array(G1099Schema).default([]),
+  form1042S: z.array(S1042Schema).default([]),
   socialSecurity: z.object({ netBenefits: money, federalWithheld: money.optional() }).optional(),
   scheduleC: z.array(ScheduleCSchema).default([]),
   rentalProperties: z.array(RentalPropertySchema).default([]),
