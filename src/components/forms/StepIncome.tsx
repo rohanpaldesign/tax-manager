@@ -33,7 +33,7 @@ function NumberInput({
           value={value || ""}
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
           placeholder={placeholder}
-          className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-200 rounded-lg pl-6 pr-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
     </div>
@@ -166,25 +166,27 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                   <span className="font-medium text-sm text-gray-800">W-2 #{i + 1}</span>
                   <button onClick={() => removeW2(i)} className="text-red-400 text-xs hover:text-red-600">Remove</button>
                 </div>
+                <p className="text-xs text-gray-400 italic">Leave any box blank if it does not appear on your W-2 form.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Employer Name</label>
                     <input type="text" value={w.employerName} onChange={e => updateW2(i, { employerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Acme Corp" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Acme Corp" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Employer EIN (Box b)</label>
                     <input type="text" value={w.employerEIN} onChange={e => updateW2(i, { employerEIN: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="XX-XXXXXXX" />
+                      maxLength={10}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="XX-XXXXXXX" />
                   </div>
                   <NumberInput label="Wages (Box 1)" value={w.wages} onChange={v => updateW2(i, { wages: v, socialSecurityWages: v, medicareWages: v, stateWages: v })} />
                   <NumberInput label="Federal Tax Withheld (Box 2)" value={w.federalWithheld} onChange={v => updateW2(i, { federalWithheld: v })} />
-                  <NumberInput label="SS Wages (Box 3)" value={w.socialSecurityWages} onChange={v => updateW2(i, { socialSecurityWages: v })} />
-                  <NumberInput label="SS Tax Withheld (Box 4)" value={w.socialSecurityWithheld} onChange={v => updateW2(i, { socialSecurityWithheld: v })} />
-                  <NumberInput label="Medicare Wages (Box 5)" value={w.medicareWages} onChange={v => updateW2(i, { medicareWages: v })} />
-                  <NumberInput label="Medicare Tax Withheld (Box 6)" value={w.medicareWithheld} onChange={v => updateW2(i, { medicareWithheld: v })} />
-                  <NumberInput label="State Wages (Box 16)" value={w.stateWages} onChange={v => updateW2(i, { stateWages: v })} />
-                  <NumberInput label="State Tax Withheld (Box 17)" value={w.stateWithheld} onChange={v => updateW2(i, { stateWithheld: v })} />
+                  <NumberInput label="SS Wages (Box 3)" value={w.socialSecurityWages} onChange={v => updateW2(i, { socialSecurityWages: v })} hint="Leave blank if Box 3 is empty on your W-2" />
+                  <NumberInput label="SS Tax Withheld (Box 4)" value={w.socialSecurityWithheld} onChange={v => updateW2(i, { socialSecurityWithheld: v })} hint="Leave blank if Box 4 is empty on your W-2" />
+                  <NumberInput label="Medicare Wages (Box 5)" value={w.medicareWages} onChange={v => updateW2(i, { medicareWages: v })} hint="Leave blank if Box 5 is empty on your W-2" />
+                  <NumberInput label="Medicare Tax Withheld (Box 6)" value={w.medicareWithheld} onChange={v => updateW2(i, { medicareWithheld: v })} hint="Leave blank if Box 6 is empty on your W-2" />
+                  <NumberInput label="State Wages (Box 16)" value={w.stateWages} onChange={v => updateW2(i, { stateWages: v })} hint="Leave blank if Box 16 is empty on your W-2" />
+                  <NumberInput label="State Tax Withheld (Box 17)" value={w.stateWithheld} onChange={v => updateW2(i, { stateWithheld: v })} hint="Leave blank if Box 17 is empty on your W-2" />
                   {w.state === "CA" && (
                     <NumberInput label="CA SDI Withheld (Box 14)" value={w.box14CaSdi ?? 0} onChange={v => updateW2(i, { box14CaSdi: v })} hint="CA State Disability Insurance — deductible on CA return" />
                   )}
@@ -220,9 +222,15 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer's Name <span className="font-normal text-gray-400">(Box left of Box 1 on your 1099-NEC)</span></label>
                     <input type="text" value={f.payerName} onChange={e => updateNEC(i, { payerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer EIN <span className="font-normal text-gray-400">(Box left of Box 1)</span></label>
+                    <input type="text" value={f.payerEIN} onChange={e => updateNEC(i, { payerEIN: e.target.value })}
+                      maxLength={10}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="XX-XXXXXXX" />
                   </div>
                   <NumberInput label="Nonemployee Compensation (Box 1)" value={f.nonemployeeCompensation} onChange={v => updateNEC(i, { nonemployeeCompensation: v })} />
                   <NumberInput label="Federal Tax Withheld (Box 4)" value={f.federalWithheld} onChange={v => updateNEC(i, { federalWithheld: v })} />
@@ -258,9 +266,9 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer's Name <span className="font-normal text-gray-400">(your bank or brokerage name, top left of 1099-INT)</span></label>
                     <input type="text" value={f.payerName} onChange={e => updateINT(i, { payerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <NumberInput label="Interest Income (Box 1)" value={f.interestIncome} onChange={v => updateINT(i, { interestIncome: v })} />
                   <NumberInput label="Federal Tax Withheld (Box 4)" value={f.federalWithheld} onChange={v => updateINT(i, { federalWithheld: v })} />
@@ -297,9 +305,9 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer's Name <span className="font-normal text-gray-400">(fund or brokerage, top left of 1099-DIV)</span></label>
                     <input type="text" value={f.payerName} onChange={e => updateDIV(i, { payerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <NumberInput label="Total Ordinary Dividends (Box 1a)" value={f.totalOrdinaryDividends} onChange={v => updateDIV(i, { totalOrdinaryDividends: v })} />
                   <NumberInput label="Qualified Dividends (Box 1b)" value={f.qualifiedDividends} onChange={v => updateDIV(i, { qualifiedDividends: v })} hint="Must be ≤ ordinary dividends" />
@@ -339,12 +347,12 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Broker / Description</label>
                     <input type="text" value={f.brokerName} onChange={e => update1099B(i, { brokerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Fidelity — AAPL" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Fidelity — AAPL" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Holding Period</label>
                     <select value={f.longTermOrShortTerm} onChange={e => update1099B(i, { longTermOrShortTerm: e.target.value as "short" | "long" })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                       <option value="short">Short-term (held ≤ 1 year)</option>
                       <option value="long">Long-term (held &gt; 1 year)</option>
                     </select>
@@ -396,14 +404,14 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer's Name <span className="font-normal text-gray-400">(retirement plan / insurer, top left of 1099-R)</span></label>
                     <input type="text" value={f.payerName} onChange={e => update1099R(i, { payerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Distribution Code (Box 7)</label>
                     <select value={f.distributionCode} onChange={e => update1099R(i, { distributionCode: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                       <option value="1">1 — Early distribution, no exception</option>
                       <option value="2">2 — Early distribution, exception applies</option>
                       <option value="3">3 — Disability</option>
@@ -707,9 +715,9 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer's Name <span className="font-normal text-gray-400">(state agency, top left of 1099-G)</span></label>
                     <input type="text" value={f.payerName} onChange={e => update1099G(i, { payerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="State EDD / DOL" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="State EDD / DOL" />
                   </div>
                   <NumberInput label="Unemployment Compensation (Box 1)" value={f.unemploymentCompensation} onChange={v => update1099G(i, { unemploymentCompensation: v })} />
                   <NumberInput label="State/Local Tax Refund (Box 2)" value={f.stateOrLocalRefund ?? 0} onChange={v => update1099G(i, { stateOrLocalRefund: v })} hint="Taxable only if you itemized last year" />
@@ -754,14 +762,14 @@ export function StepIncome({ input, update, onNext, onBack, hideFooter }: Props)
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer Name</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Payer's Name <span className="font-normal text-gray-400">(university or employer, top left of 1042-S)</span></label>
                     <input type="text" value={f.payerName} onChange={e => update1042S(i, { payerName: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="University / Employer" />
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="University / Employer" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Income Code (Box 1)</label>
                     <select value={f.incomeCode} onChange={e => update1042S(i, { incomeCode: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                       <option value="15">15 — Scholarships / Fellowships (taxable portion)</option>
                       <option value="16">16 — Scholarship / Fellowship (treaty exempt)</option>
                       <option value="17">17 — Independent personal services</option>

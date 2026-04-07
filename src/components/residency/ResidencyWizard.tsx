@@ -222,7 +222,9 @@ export function ResidencyWizard({ onComplete }: Props) {
       {/* ── Section 4: I-94 & Visa Arrival Dates ──────────────────────────── */}
       {showVisaDates && (
         <Section n={sectionNum()} title="Visa Arrival Dates & I-94 Information">
-          <Hint>Your I-94 Arrival/Departure Record shows your admission date and authorized stay. Find it at i94.cbp.dhs.gov. These dates determine your exempt individual status.</Hint>
+          <Hint>Your I-94 Arrival/Departure Record shows your admission date and authorized stay. Find it at{" "}
+            <a href="https://i94.cbp.dhs.gov" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">i94.cbp.dhs.gov</a>.
+            {" "}These dates determine your exempt individual status.</Hint>
 
           {hasDiplomatic && (
             <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
@@ -433,30 +435,27 @@ export function ResidencyWizard({ onComplete }: Props) {
               )}
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-800 mb-2">Is your home country a US income tax treaty country?</p>
-              <div className="flex gap-3 mb-3">
-                <RadioPill label="Yes" checked={!!input.homeTreatyCountry && input.homeTreatyCountry !== "" && input.homeTreatyCountry !== "unknown"}
-                  onChange={() => upd({ homeTreatyCountry: undefined })} />
-                <RadioPill label="No" checked={input.homeTreatyCountry === ""}
-                  onChange={() => upd({ homeTreatyCountry: "", hasTreatyBenefits: false })} />
-                <RadioPill label="Not sure" checked={input.homeTreatyCountry === "unknown"}
-                  onChange={() => upd({ homeTreatyCountry: "unknown", hasTreatyBenefits: false })} />
+              <p className="text-sm font-semibold text-gray-800 mb-1">What is your home country?</p>
+              <Hint>Start typing to search. We'll automatically check if your country has a US tax treaty that may reduce your withholding rate.</Hint>
+              <div className="mt-2 space-y-2">
+                <input list="treaty-countries-list" placeholder="e.g. India, Germany, China…"
+                  value={input.homeTreatyCountry === "unknown" || input.homeTreatyCountry === undefined ? "" : input.homeTreatyCountry}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    upd({ homeTreatyCountry: val, hasTreatyBenefits: TREATY_COUNTRIES.includes(val) });
+                  }}
+                  className="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <datalist id="treaty-countries-list">
+                  {TREATY_COUNTRIES.map((c) => <option key={c} value={c} />)}
+                </datalist>
+                {input.homeTreatyCountry && input.homeTreatyCountry !== "unknown" && input.homeTreatyCountry !== "" && (
+                  input.hasTreatyBenefits ? (
+                    <p className="text-xs text-blue-600 font-medium">✓ {input.homeTreatyCountry} has a US income tax treaty. Potential treaty benefits will be noted in your return.</p>
+                  ) : (
+                    <p className="text-xs text-gray-500">No US tax treaty found for {input.homeTreatyCountry}. Standard NRA withholding rates apply.</p>
+                  )
+                )}
               </div>
-              {input.homeTreatyCountry !== "" && input.homeTreatyCountry !== "unknown" && (
-                <div className="space-y-2">
-                  <label className="block text-xs font-medium text-gray-600">Which country?</label>
-                  <input list="treaty-countries-list" placeholder="Start typing country name…"
-                    value={input.homeTreatyCountry ?? ""}
-                    onChange={(e) => upd({ homeTreatyCountry: e.target.value, hasTreatyBenefits: TREATY_COUNTRIES.includes(e.target.value) })}
-                    className="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  <datalist id="treaty-countries-list">
-                    {TREATY_COUNTRIES.map((c) => <option key={c} value={c} />)}
-                  </datalist>
-                  {input.hasTreatyBenefits && (
-                    <p className="text-xs text-blue-600">✓ {input.homeTreatyCountry} has a US tax treaty. Potential treaty benefits will be noted in your return.</p>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </Section>
@@ -497,7 +496,7 @@ export function ResidencyWizard({ onComplete }: Props) {
             disabled={!canConfirm}
             className="bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Confirm Classification & Continue →
+            Continue →
           </button>
         </div>
       )}

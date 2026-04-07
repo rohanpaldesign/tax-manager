@@ -219,7 +219,7 @@ export const TaxReturnInputSchema = z.object({
   // Taxpayer
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  ssn: z.string().regex(/^\d{3}-?\d{2}-?\d{4}$/, "SSN must be 9 digits"),
+  ssn: z.string().default(""),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   occupation: z.string().default(""),
   address: z.string().min(1, "Address is required"),

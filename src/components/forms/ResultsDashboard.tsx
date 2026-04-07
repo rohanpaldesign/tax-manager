@@ -34,6 +34,9 @@ export function ResultsDashboard({ result, returnId, input, update, onBack }: Pr
   const [activeTab, setActiveTab] = useState<"summary" | "federal" | "state" | "forms" | "instructions">("summary");
   const [ssnInput, setSsnInput] = useState(input.ssn ?? "");
   const [ssnSaved, setSsnSaved] = useState(!!(input.ssn && input.ssn.replace(/\D/g, "").length === 9));
+  const [routingNumber, setRoutingNumber] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountType, setAccountType] = useState<"checking" | "savings">("checking");
   const f = result.federal;
 
   const hasSsn = ssnSaved && input.ssn && input.ssn.replace(/\D/g, "").length === 9;
@@ -50,7 +53,7 @@ export function ResultsDashboard({ result, returnId, input, update, onBack }: Pr
       const res = await fetch("/api/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input, result }),
+        body: JSON.stringify({ input, result, directDeposit: routingNumber ? { routingNumber, accountNumber, accountType } : undefined }),
       });
       if (!res.ok) throw new Error("Failed");
       const blob = await res.blob();
@@ -203,6 +206,54 @@ export function ResultsDashboard({ result, returnId, input, update, onBack }: Pr
               </button>
               <span className="text-xs text-blue-600">Your SSN is used only to fill in the form — never stored separately.</span>
             </div>
+          </div>
+        )}
+
+        {/* Direct Deposit — shown when there's a federal refund */}
+        {f.refund > 0 && (
+          <div className="mb-6 p-5 bg-green-50 border border-green-200 rounded-2xl">
+            <p className="text-sm font-semibold text-green-900 mb-1">Direct Deposit (Optional)</p>
+            <p className="text-sm text-green-700 mb-3">
+              Get your {money(f.refund)} refund deposited directly to your bank. Leave blank if you prefer a paper check.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Routing Number (9 digits)</label>
+                <input
+                  type="text"
+                  value={routingNumber}
+                  onChange={(e) => setRoutingNumber(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                  placeholder="021000021"
+                  maxLength={9}
+                  className="w-full border border-green-300 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Account Number</label>
+                <input
+                  type="text"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 17))}
+                  placeholder="Your account number"
+                  maxLength={17}
+                  className="w-full border border-green-300 rounded-lg px-3 py-2 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Account Type</label>
+                <select
+                  value={accountType}
+                  onChange={(e) => setAccountType(e.target.value as "checking" | "savings")}
+                  className="w-full border border-green-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                >
+                  <option value="checking">Checking</option>
+                  <option value="savings">Savings</option>
+                </select>
+              </div>
+            </div>
+            {routingNumber.length === 9 && accountNumber.length > 0 && (
+              <p className="text-xs text-green-700 mt-2">✓ Direct deposit information will be included in your PDF.</p>
+            )}
           </div>
         )}
 

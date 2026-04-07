@@ -124,7 +124,8 @@ export function StepDeductions({ input, update, onNext, onBack, hideFooter }: Pr
 
       {/* Retirement Contributions */}
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-        <h3 className="font-semibold text-gray-800">Retirement Contributions</h3>
+        <h3 className="font-semibold text-gray-800">Retirement Contributions <span className="text-sm font-normal text-gray-400">(Optional)</span></h3>
+        <p className="text-xs text-gray-500">Only enter contributions you made <strong>directly</strong> — e.g., personal IRA deposits or solo 401(k) contributions. Do <strong>not</strong> re-enter pre-tax 401(k)/403(b) payroll deductions from your W-2; those are already reflected in Box 1 wages and do not appear here.</p>
         <div className="grid grid-cols-2 gap-4">
           <NumberInput label="Traditional IRA Contributions" value={input.retirementContributions.traditionalIRA}
             onChange={v => update({ retirementContributions: { ...input.retirementContributions, traditionalIRA: v } })} hint="Max $7,000 ($8,000 if 50+)" />
