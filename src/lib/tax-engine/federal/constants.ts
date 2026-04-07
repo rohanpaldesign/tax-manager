@@ -166,7 +166,8 @@ export const SS_THRESHOLD_2: Record<FilingStatus, number> = {
 // ─── Child Tax Credit ─────────────────────────────────────────────────────────
 export const CHILD_TAX_CREDIT_AMOUNT = 2_000;     // per qualifying child under 17
 export const OTHER_DEPENDENT_CREDIT = 500;
-export const ADDITIONAL_CTC_RATE = 0.15;           // refundable portion
+export const ADDITIONAL_CTC_RATE = 0.15;           // refundable portion rate
+export const ADDITIONAL_CTC_MAX_PER_CHILD = 1_700; // 2025 per-child refundable cap
 export const CHILD_TAX_CREDIT_PHASEOUT_MFJ = 400_000;
 export const CHILD_TAX_CREDIT_PHASEOUT_OTHER = 200_000;
 export const CHILD_TAX_CREDIT_PHASEOUT_INCREMENT = 50; // per $1,000 over threshold
@@ -176,13 +177,14 @@ export const EITC_MAX_INVESTMENT_INCOME = 11_600;
 export const EITC_RATES: Array<{
   children: number;
   maxCredit: number;
+  phaseInRate: number;
   phaseoutStart: Record<"single_hoh" | "mfj", number>;
   phaseoutEnd: Record<"single_hoh" | "mfj", number>;
 }> = [
-  { children: 0, maxCredit: 649, phaseoutStart: { single_hoh: 10_620, mfj: 17_360 }, phaseoutEnd: { single_hoh: 18_591, mfj: 25_511 } },
-  { children: 1, maxCredit: 4_328, phaseoutStart: { single_hoh: 23_350, mfj: 30_090 }, phaseoutEnd: { single_hoh: 49_084, mfj: 56_004 } },
-  { children: 2, maxCredit: 7_152, phaseoutStart: { single_hoh: 23_350, mfj: 30_090 }, phaseoutEnd: { single_hoh: 55_768, mfj: 62_688 } },
-  { children: 3, maxCredit: 8_046, phaseoutStart: { single_hoh: 23_350, mfj: 30_090 }, phaseoutEnd: { single_hoh: 59_899, mfj: 66_819 } },
+  { children: 0, maxCredit: 649,   phaseInRate: 0.0765, phaseoutStart: { single_hoh: 10_620, mfj: 17_360 }, phaseoutEnd: { single_hoh: 18_591, mfj: 25_511 } },
+  { children: 1, maxCredit: 4_328, phaseInRate: 0.34,   phaseoutStart: { single_hoh: 23_350, mfj: 30_090 }, phaseoutEnd: { single_hoh: 49_084, mfj: 56_004 } },
+  { children: 2, maxCredit: 7_152, phaseInRate: 0.40,   phaseoutStart: { single_hoh: 23_350, mfj: 30_090 }, phaseoutEnd: { single_hoh: 55_768, mfj: 62_688 } },
+  { children: 3, maxCredit: 8_046, phaseInRate: 0.45,   phaseoutStart: { single_hoh: 23_350, mfj: 30_090 }, phaseoutEnd: { single_hoh: 59_899, mfj: 66_819 } },
 ];
 
 // ─── IRA Contribution Limits ─────────────────────────────────────────────────

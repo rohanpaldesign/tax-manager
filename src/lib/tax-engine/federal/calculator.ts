@@ -134,18 +134,21 @@ function computeEITC(
   const isMFJ = filingStatus === "married_filing_jointly";
   const phaseType = isMFJ ? "mfj" : "single_hoh";
 
-  // Credit phases in at 34% (no children: 7.65%), phases out
-  const incomeForCalc = Math.min(earnedIncome, agi);
   const maxCredit = row.maxCredit;
   const phaseoutStart = row.phaseoutStart[phaseType];
   const phaseoutEnd = row.phaseoutEnd[phaseType];
 
-  if (incomeForCalc > phaseoutEnd) return 0;
-  if (incomeForCalc <= phaseoutStart) return maxCredit;
+  // Phase-in: credit grows at phaseInRate per dollar of earned income up to maxCredit
+  const phaseInCredit = Math.min(earnedIncome * row.phaseInRate, maxCredit);
+
+  // Phase-out: uses the GREATER of earned income or AGI (per IRS Publication 596)
+  const incomeForPhaseout = Math.max(earnedIncome, agi);
+  if (incomeForPhaseout >= phaseoutEnd) return 0;
+  if (incomeForPhaseout <= phaseoutStart) return phaseInCredit;
 
   const phaseoutRange = phaseoutEnd - phaseoutStart;
-  const reduction = ((incomeForCalc - phaseoutStart) / phaseoutRange) * maxCredit;
-  return clamp(maxCredit - reduction);
+  const reduction = ((incomeForPhaseout - phaseoutStart) / phaseoutRange) * maxCredit;
+  return clamp(phaseInCredit - reduction);
 }
 
 // ─── Child Tax Credit ─────────────────────────────────────────────────────────
@@ -171,8 +174,7 @@ function computeChildTaxCredit(
     baseCredit = clamp(baseCredit - excess * C.CHILD_TAX_CREDIT_PHASEOUT_INCREMENT);
   }
 
-  const maxRefundable =
-    numQualifyingChildren * C.CHILD_TAX_CREDIT_AMOUNT * 0.15; // approximation
+  const maxRefundable = numQualifyingChildren * C.ADDITIONAL_CTC_MAX_PER_CHILD;
   const refundablePortion = Math.min(
     baseCredit,
     Math.max(0, (earnedIncome - 2_500) * C.ADDITIONAL_CTC_RATE),
@@ -389,7 +391,10 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   // ── Step 2: Self-Employment Tax ──────────────────────────────────────────────
   const seSelfEmploymentIncome = Math.max(0, scheduleC_grossProfit + nec1099Income);
   const seNetEarnings = seSelfEmploymentIncome * 0.9235; // × 92.35%
-  const seSSTaxableWages = Math.min(seNetEarnings, C.SE_SS_WAGE_BASE);
+  // SS wage base is shared between W-2 wages and SE income — reduce remaining base
+  const w2SSWages = input.w2Income.reduce((s, w) => s + (w.socialSecurityWages || w.wages), 0);
+  const remainingSSWageBase = Math.max(0, C.SE_SS_WAGE_BASE - w2SSWages);
+  const seSSTaxableWages = Math.min(seNetEarnings, remainingSSWageBase);
   const seTax =
     seNetEarnings > 0
       ? seSSTaxableWages * C.SE_SS_RATE + seNetEarnings * C.SE_MEDICARE_RATE
@@ -425,7 +430,7 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   // Cap at family limit as upper bound; individual limit is $4,300
   const hsaDeduction = Math.min(input.retirementContributions.hsa, C.HSA_LIMIT_FAMILY);
 
-  const totalAdjustments =
+  const aboveLineAdjustments =
     seDeduction +
     selfEmployedHealthIns +
     sepIRADeduction +
@@ -435,67 +440,68 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     hsaDeduction +
     educatorExpensesDeduction;
 
-  // First-pass AGI (SS not yet included)
-  const agiWithoutSS = totalIncomeBeforeSS - totalAdjustments;
+  // First-pass AGI (SS not yet included, IRA not yet included — used as MAGI for IRA phaseout)
+  const magiWithoutSS = totalIncomeBeforeSS - aboveLineAdjustments;
 
-  // SS taxable amount (depends on AGI)
-  const taxableSS = computeTaxableSocialSecurity(ssBenefits, agiWithoutSS + taxExemptInterest, fs);
-  const adjustedGrossIncome = agiWithoutSS + taxableSS;
+  // SS taxable amount (computed on MAGI per IRS — does not include IRA deduction)
+  const taxableSS = computeTaxableSocialSecurity(ssBenefits, magiWithoutSS + taxExemptInterest, fs);
+  const magi = magiWithoutSS + taxableSS; // Modified AGI (pre-IRA) — used for IRA phaseout
   const totalIncome = totalIncomeBeforeSS + taxableSS;
 
-  // ── Passive Activity Loss (PAL) Limitation — IRC §469(i) ───────────────────
-  // Active participation rental losses deductible up to $25,000 against ordinary income.
-  // Phase-out: $1 per $2 of AGI above $100,000; fully phased out at $150,000.
-  // MFS filers living apart all year get $12,500/$50,000 thresholds; otherwise $0.
-  let scheduleE_net = scheduleE_grossNet;
-  if (scheduleE_grossNet < 0) {
-    const rentalLoss = -scheduleE_grossNet;
-    let palAllowance: number;
-    if (fs === "married_filing_separately") {
-      // MFS living together = $0 allowance; living apart = $12,500 phased from $50k
-      // Conservative: use $0 for MFS (most common case)
-      palAllowance = 0;
-    } else {
-      const palMax = 25_000;
-      const palPhaseoutStart = 100_000;
-      const palPhaseoutEnd = 150_000;
-      if (adjustedGrossIncome <= palPhaseoutStart) {
-        palAllowance = palMax;
-      } else if (adjustedGrossIncome >= palPhaseoutEnd) {
-        palAllowance = 0;
-      } else {
-        palAllowance = palMax - ((adjustedGrossIncome - palPhaseoutStart) / 2);
-      }
-    }
-    const allowedLoss = Math.min(rentalLoss, palAllowance);
-    scheduleE_net = -allowedLoss;
-    // Note: disallowed losses carry forward (not tracked here yet)
-  }
-
-  // ── Traditional IRA Deductibility ──────────────────────────────────────────
-  // Active plan participant: W-2 employee (employer likely has retirement plan) OR
-  // self-employed with SEP/SIMPLE/Solo 401k contributions
+  // ── Traditional IRA Deductibility (phaseout uses MAGI, i.e., pre-IRA AGI) ─
   const isActivePlanParticipant =
     input.w2Income.length > 0 ||
     input.retirementContributions.sep_ira > 0 ||
     input.retirementContributions.simple_ira > 0 ||
     input.retirementContributions.solo401k_traditional > 0;
-  // Cap IRA contribution at legal limit
-  const iraLimit = C.IRA_CONTRIBUTION_LIMIT; // $7,000 (age-50+ catchup not tracked in Phase 1)
+  const iraLimit = C.IRA_CONTRIBUTION_LIMIT; // $7,000 (age-50+ catchup not tracked)
   const iraContrib = Math.min(input.retirementContributions.traditionalIRA, iraLimit);
   let traditionalIRADeductible = 0;
   if (isActivePlanParticipant) {
     const [lo, hi] = C.TRADITIONAL_IRA_DEDUCTION_PHASEOUT_ACTIVE[fs];
-    if (adjustedGrossIncome <= lo) {
+    if (magi <= lo) {
       traditionalIRADeductible = iraContrib;
-    } else if (adjustedGrossIncome < hi) {
-      const pct = 1 - (adjustedGrossIncome - lo) / (hi - lo);
-      // Round down to nearest $10 per IRS rules, minimum $200 if otherwise eligible
+    } else if (magi < hi) {
+      const pct = 1 - (magi - lo) / (hi - lo);
       traditionalIRADeductible = Math.max(0, Math.floor(iraContrib * pct / 10) * 10);
     }
   } else {
     traditionalIRADeductible = iraContrib;
   }
+
+  // Total above-line adjustments including IRA (IRA is an above-the-line deduction)
+  const totalAdjustments = aboveLineAdjustments + traditionalIRADeductible;
+
+  // ── Passive Activity Loss (PAL) Limitation — IRC §469(i) ───────────────────
+  // Compute pre-PAL AGI to determine allowance (circular dependency resolved by one-pass)
+  const prePalAgi = totalIncomeBeforeSS - totalAdjustments + taxableSS;
+
+  let scheduleE_net = scheduleE_grossNet;
+  if (scheduleE_grossNet < 0) {
+    const rentalLoss = -scheduleE_grossNet;
+    let palAllowance: number;
+    if (fs === "married_filing_separately") {
+      palAllowance = 0; // Conservative: MFS living together = $0
+    } else {
+      const palMax = 25_000;
+      const palPhaseoutStart = 100_000;
+      const palPhaseoutEnd = 150_000;
+      if (prePalAgi <= palPhaseoutStart) {
+        palAllowance = palMax;
+      } else if (prePalAgi >= palPhaseoutEnd) {
+        palAllowance = 0;
+      } else {
+        palAllowance = palMax - ((prePalAgi - palPhaseoutStart) / 2);
+      }
+    }
+    const allowedLoss = Math.min(rentalLoss, palAllowance);
+    scheduleE_net = -allowedLoss;
+    // Disallowed rental losses carry forward (not tracked across years yet)
+  }
+
+  // Add back any disallowed rental loss to get final AGI
+  const palAdjustment = scheduleE_grossNet - scheduleE_net; // positive when loss was trimmed
+  const adjustedGrossIncome = prePalAgi + palAdjustment;
 
   // ── Step 4: Deductions — always compute both, pick the larger ──────────────
   // MFS SALT cap is $5,000 (half of the $10,000 for other statuses)
@@ -539,7 +545,7 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
 
   // QBI Deduction (Section 199A) — NRAs are not eligible (IRC §199A applies to US persons only)
   const qbiNetIncome = Math.max(0, scheduleC_grossProfit + nec1099Income + scheduleE_net);
-  const taxableIncomeBeforeQBI = clamp(adjustedGrossIncome - standardOrItemized - traditionalIRADeductible);
+  const taxableIncomeBeforeQBI = clamp(adjustedGrossIncome - standardOrItemized);
   const qbiDeduction = !isNRA ? computeQBIDeduction(qbiNetIncome, taxableIncomeBeforeQBI, fs) : 0;
 
   const taxableIncome = clamp(taxableIncomeBeforeQBI - qbiDeduction);
@@ -606,11 +612,16 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
     ? computeEITC(adjustedGrossIncome, earnedIncome, numEITCChildren, fs, investmentIncome)
     : 0;
 
-  // Child & Dependent Care Credit (Form 2441)
+  // Child & Dependent Care Credit (Form 2441) — sliding scale 20%–35% based on AGI
+  function childCareCreditRate(agi: number): number {
+    if (agi <= 15_000) return 0.35;
+    if (agi >= 43_000) return 0.20;
+    return 0.35 - Math.floor((agi - 15_000) / 2_000) * 0.01;
+  }
   const childCareExpenses = input.childCareExpenses ?? 0;
   const childCareCredit =
     childCareExpenses > 0
-      ? Math.min(childCareExpenses, 3_000) * (adjustedGrossIncome < 15_000 ? 0.35 : 0.20)
+      ? Math.min(childCareExpenses, 3_000) * childCareCreditRate(adjustedGrossIncome)
       : 0;
 
   // Foreign Tax Credit (simplified — Form 1116 not computed here)
@@ -619,13 +630,15 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   // Education credits
   let educationCredits = 0;
   for (const edu of input.tuitionEducation) {
+    const qualified = Math.max(0, edu.qualifiedExpenses - edu.scholarships);
     if (edu.firstFourYears && edu.halfTimeOrMore) {
-      // American Opportunity Credit: max $2,500
-      const aoc = Math.min(edu.qualifiedExpenses - edu.scholarships, 4_000);
-      educationCredits += aoc >= 2_000 ? 2_500 : aoc * 1.25;
+      // American Opportunity Credit: 100% of first $2,000 + 25% of next $2,000 = $2,500 max
+      const firstTwo = Math.min(qualified, 2_000);
+      const secondTwo = Math.min(Math.max(0, qualified - 2_000), 2_000);
+      educationCredits += firstTwo + secondTwo * 0.25;
     } else {
-      // Lifetime Learning Credit: 20% up to $10,000
-      educationCredits += Math.min(edu.qualifiedExpenses - edu.scholarships, 10_000) * 0.20;
+      // Lifetime Learning Credit: 20% of up to $10,000 qualified expenses
+      educationCredits += Math.min(qualified, 10_000) * 0.20;
     }
   }
 
