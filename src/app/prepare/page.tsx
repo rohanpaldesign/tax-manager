@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { TaxReturnInput, TaxCalculationResult } from "@/types/tax";
 import type { ResidencyResult } from "@/types/residency";
 import { StageRail } from "@/components/layout/StageRail";
@@ -88,6 +88,34 @@ export default function PreparePage() {
   const [returnId, setReturnId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
+
+  // Restore a previously saved return if ?resume=<id> is in the URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resumeId = params.get("resume");
+    if (!resumeId) return;
+    setResumeLoading(true);
+    fetch(`/api/returns/${resumeId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.input) {
+          setInput({ ...emptyInput, ...data.input });
+          setReturnId(data.id);
+          if (data.result) {
+            setResult(data.result);
+            // Jump straight to review so user can see results or make changes
+            setStage(STAGE_REVIEW);
+            setCompletedStages([STAGE_RESIDENCY, STAGE_INCOME, STAGE_DEDUCTIONS, STAGE_REVIEW]);
+          } else {
+            setStage(STAGE_INCOME);
+            setCompletedStages([STAGE_RESIDENCY]);
+          }
+        }
+      })
+      .catch(() => { /* silently fall through to normal flow */ })
+      .finally(() => setResumeLoading(false));
+  }, []);
 
   const update = (patch: Partial<TaxReturnInput>) =>
     setInput((prev) => ({ ...prev, ...patch }));
@@ -136,6 +164,14 @@ export default function PreparePage() {
     input.address.trim() &&
     input.city.trim() &&
     input.zip.trim();
+
+  if (resumeLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500 text-sm">Loading your return…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

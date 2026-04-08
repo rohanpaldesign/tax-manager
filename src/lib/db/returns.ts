@@ -99,6 +99,33 @@ export async function deleteTaxReturn(
   });
 }
 
+export async function getTaxReturnForUser(id: string, userId: string): Promise<TaxReturn | null> {
+  const db = getDb();
+  if (!db) return null;
+  const result = await db.execute({
+    sql: `SELECT * FROM tax_returns WHERE id = ? AND user_id = ?`,
+    args: [id, userId],
+  });
+  if (result.rows.length === 0) return null;
+  return rowToTaxReturn(result.rows[0] as Record<string, unknown>);
+}
+
+export async function findLatestReturn(
+  sessionKey: string,
+  userId?: string | null
+): Promise<TaxReturn | null> {
+  const db = getDb();
+  if (!db) return null;
+  // Find the most recently updated return for this session or user (prefer user match)
+  const sql = userId
+    ? `SELECT * FROM tax_returns WHERE (session_key = ? OR user_id = ?) ORDER BY updated_at DESC LIMIT 1`
+    : `SELECT * FROM tax_returns WHERE session_key = ? ORDER BY updated_at DESC LIMIT 1`;
+  const args = userId ? [sessionKey, userId] : [sessionKey];
+  const result = await db.execute({ sql, args });
+  if (result.rows.length === 0) return null;
+  return rowToTaxReturn(result.rows[0] as Record<string, unknown>);
+}
+
 export async function listUserReturns(userId: string): Promise<TaxReturn[]> {
   const db = getDb();
   if (!db) return [];

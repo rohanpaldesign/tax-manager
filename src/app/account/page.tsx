@@ -76,7 +76,7 @@ export default async function AccountPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <a href="/prepare" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                          <a href={`/prepare?resume=${r.id}`} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                             Resume →
                           </a>
                           <DeleteReturnButton returnId={r.id} />
@@ -94,31 +94,45 @@ export default async function AccountPage() {
                     Completed <span className="font-normal normal-case">(saved permanently)</span>
                   </p>
                   <div className="space-y-2">
-                    {completed.map((r) => (
-                      <div key={r.id} className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Tax Year {r.taxYear} — Complete</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Filed {fmtDate(r.updatedAt)}
-                          </p>
-                          {r.result && (
-                            <p className="text-xs text-green-700 mt-0.5">
-                              {r.result.federal.refund > 0
-                                ? `Federal refund: $${Math.round(r.result.federal.refund).toLocaleString()}`
-                                : r.result.federal.amountDue > 0
-                                ? `Federal due: $${Math.round(r.result.federal.amountDue).toLocaleString()}`
-                                : 'Federal: $0 balance'}
+                    {completed.map((r) => {
+                      const ageMs = Date.now() - new Date(r.createdAt).getTime();
+                      const withinEditWindow = ageMs < 30 * 24 * 60 * 60 * 1000;
+                      return (
+                        <div key={r.id} className="flex items-center justify-between p-4 bg-green-50 rounded-xl border border-green-200">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Tax Year {r.taxYear} — Complete</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Filed {fmtDate(r.updatedAt)}
                             </p>
-                          )}
+                            {r.result && (
+                              <p className="text-xs text-green-700 mt-0.5">
+                                {r.result.federal.refund > 0
+                                  ? `Federal refund: $${Math.round(r.result.federal.refund).toLocaleString()}`
+                                  : r.result.federal.amountDue > 0
+                                  ? `Federal due: $${Math.round(r.result.federal.amountDue).toLocaleString()}`
+                                  : 'Federal: $0 balance'}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {withinEditWindow && (
+                              <a
+                                href={`/prepare?resume=${r.id}`}
+                                className="text-sm text-blue-600 hover:text-blue-700 font-medium border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                              >
+                                Open / Edit
+                              </a>
+                            )}
+                            <a
+                              href={`/api/returns/${r.id}/pdf`}
+                              className="text-sm text-green-700 hover:text-green-800 font-medium border border-green-300 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-colors"
+                            >
+                              Download PDF
+                            </a>
+                          </div>
                         </div>
-                        <a
-                          href={`/api/returns/${r.id}/pdf`}
-                          className="text-sm text-green-700 hover:text-green-800 font-medium border border-green-300 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-colors"
-                        >
-                          Download PDF
-                        </a>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

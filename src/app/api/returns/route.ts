@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createTaxReturn, listTaxReturns } from "@/lib/db/returns";
+import { createTaxReturn, updateTaxReturn, findLatestReturn, listTaxReturns } from "@/lib/db/returns";
 import { initDb } from "@/lib/db/client";
 import { calculateTaxes } from "@/lib/tax-engine";
 import { TaxReturnInputSchema } from "@/lib/validation";
@@ -44,7 +44,16 @@ export async function POST(req: NextRequest) {
     }
 
     const result = calculateTaxes(parsed.data);
-    const id = await createTaxReturn(sessionKey, parsed.data, result, userId, 6);
+
+    // Upsert: update existing return if one already exists for this session/user
+    const existing = await findLatestReturn(sessionKey, userId);
+    let id: string;
+    if (existing) {
+      await updateTaxReturn(existing.id, existing.sessionKey, parsed.data, result);
+      id = existing.id;
+    } else {
+      id = await createTaxReturn(sessionKey, parsed.data, result, userId, 6);
+    }
 
     const response = NextResponse.json({ id, result }, { status: 201 });
     response.cookies.set("session_key", sessionKey, {

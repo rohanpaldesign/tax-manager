@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTaxReturn } from "@/lib/db/returns";
+import { getTaxReturn, getTaxReturnForUser } from "@/lib/db/returns";
 import { generateTaxPDFs } from "@/lib/pdf/generator";
+import { getSession } from "@/lib/auth/session";
+import { initDb } from "@/lib/db/client";
 
 function getSessionKey(req: NextRequest): string {
   return req.cookies.get("session_key")?.value ?? "";
+}
+
+async function getAuthUserId(req: NextRequest): Promise<string | null> {
+  const sessionId = req.cookies.get("tm_session")?.value;
+  if (!sessionId) return null;
+  const session = await getSession(sessionId);
+  return session?.userId ?? null;
 }
 
 export async function GET(
@@ -11,9 +20,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await initDb();
     const { id } = await params;
     const sessionKey = getSessionKey(req);
-    const taxReturn = await getTaxReturn(id, sessionKey);
+    let taxReturn = await getTaxReturn(id, sessionKey);
+    // Fallback: authenticated users can download their own returns
+    if (!taxReturn) {
+      const userId = await getAuthUserId(req);
+      if (userId) taxReturn = await getTaxReturnForUser(id, userId);
+    }
 
     if (!taxReturn || !taxReturn.result) {
       return NextResponse.json(

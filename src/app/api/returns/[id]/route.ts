@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTaxReturn, updateTaxReturn, deleteTaxReturn } from "@/lib/db/returns";
+import { getTaxReturn, getTaxReturnForUser, updateTaxReturn, deleteTaxReturn } from "@/lib/db/returns";
 import { calculateTaxes } from "@/lib/tax-engine";
+import { getSession } from "@/lib/auth/session";
 
 function getSessionKey(req: NextRequest): string {
   return req.cookies.get("session_key")?.value ?? "";
+}
+
+async function getAuthUserId(req: NextRequest): Promise<string | null> {
+  const sessionId = req.cookies.get("tm_session")?.value;
+  if (!sessionId) return null;
+  const session = await getSession(sessionId);
+  return session?.userId ?? null;
 }
 
 export async function GET(
@@ -12,7 +20,12 @@ export async function GET(
 ) {
   const { id } = await params;
   const sessionKey = getSessionKey(req);
-  const taxReturn = await getTaxReturn(id, sessionKey);
+  let taxReturn = await getTaxReturn(id, sessionKey);
+  // Fallback: authenticated users can access by userId
+  if (!taxReturn) {
+    const userId = await getAuthUserId(req);
+    if (userId) taxReturn = await getTaxReturnForUser(id, userId);
+  }
   if (!taxReturn) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

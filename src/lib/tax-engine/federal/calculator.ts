@@ -500,7 +500,8 @@ export function calculateFederalTax(input: TaxReturnInput): FederalTaxResult {
   }
 
   // Add back any disallowed rental loss to get final AGI
-  const palAdjustment = scheduleE_grossNet - scheduleE_net; // positive when loss was trimmed
+  // scheduleE_net >= scheduleE_grossNet (less negative), so this is >= 0
+  const palAdjustment = scheduleE_net - scheduleE_grossNet;
   const adjustedGrossIncome = prePalAgi + palAdjustment;
 
   // ── Step 4: Deductions — always compute both, pick the larger ──────────────
